@@ -1,0 +1,21 @@
+# ambiente e cache
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.log
+
+# empacotamento
+*.egg-info/
+build/
+dist/
+*.whl
+
+# editor / sistema
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# rascunhos locais
+mockups/

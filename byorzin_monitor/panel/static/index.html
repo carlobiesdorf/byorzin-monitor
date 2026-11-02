@@ -1,0 +1,1261 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Byorzin Monitor</title>
+<link rel="icon" href="img/icon.png">
+<script>
+/* tema antes do primeiro desenho: escolhido no painel (localStorage) ou o do sistema */
+(function(){var t=localStorage.getItem('byorzin.theme');if(t!='light'&&t!='dark')t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+document.documentElement.dataset.theme=t})();
+</script>
+<style>
+/* ---------- tokens ---------- */
+:root{
+  --bg:#0a0c11;--bg-side:#0d1016;--surface:#11151d;--surface-2:#161b25;--surface-3:#1c2230;--hover:rgba(255,255,255,.035);
+  --border:#1f2531;--border-2:#2a3141;--text:#e7eaf0;--text-2:#a1a9ba;--text-3:#6c7488;
+  --accent:#39ff88;--accent-text:#39ff88;--accent-ink:#03140a;--accent-soft:rgba(57,255,136,.10);--accent-line:rgba(57,255,136,.35);
+  --working:#4cc9f0;--waiting:#f5b544;--error:#f2555a;--idle:#7a8397;--rot:#a78bfa;--llm:#f472b6;
+  --working-bg:rgba(76,201,240,.12);--waiting-bg:rgba(245,181,68,.13);--error-bg:rgba(242,85,90,.13);--idle-bg:rgba(122,131,151,.14);--rot-bg:rgba(167,139,250,.14);--llm-bg:rgba(244,114,182,.14);
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.5);--shadow-lg:0 24px 64px -16px rgba(0,0,0,.7);
+  --ring:0 0 0 3px rgba(57,255,136,.28);--r:12px;--r-sm:8px;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --side-w:248px;
+}
+html[data-theme=light]{
+  --bg:#f5f6f8;--bg-side:#fbfbfc;--surface:#ffffff;--surface-2:#f4f5f7;--surface-3:#eceef2;--hover:rgba(15,20,30,.035);
+  --border:#e3e6eb;--border-2:#d3d8e0;--text:#10141b;--text-2:#4b5363;--text-3:#7a8292;
+  --accent:#39ff88;--accent-text:#0b8a43;--accent-ink:#03140a;--accent-soft:rgba(22,163,74,.09);--accent-line:rgba(22,163,74,.4);
+  --working:#0e8fb3;--waiting:#b9770e;--error:#d92d33;--idle:#6b7385;--rot:#7c5ce0;--llm:#c2378a;
+  --working-bg:rgba(14,143,179,.10);--waiting-bg:rgba(185,119,14,.11);--error-bg:rgba(217,45,51,.09);--idle-bg:rgba(107,115,133,.10);--rot-bg:rgba(124,92,224,.10);--llm-bg:rgba(194,55,138,.10);
+  --shadow:0 1px 2px rgba(16,20,27,.05),0 6px 20px -12px rgba(16,20,27,.18);--shadow-lg:0 24px 64px -16px rgba(16,20,27,.28);
+  --ring:0 0 0 3px rgba(22,163,74,.25);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  -webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 0}
+a{color:var(--accent-text);text-decoration:none}a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--accent-text);outline-offset:2px}
+button,input,select{font:inherit;color:inherit}
+.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+.i.sm{width:15px;height:15px}.i.xs{width:13px;height:13px}
+.num{font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+[hidden]{display:none!important}
+
+/* ---------- casca: lateral + topo ---------- */
+.side{position:fixed;inset:0 auto 0 0;width:var(--side-w);background:var(--bg-side);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;z-index:40;transition:transform .22s ease}
+.brand{display:flex;align-items:center;gap:11px;padding:18px 18px 16px}
+.brand img{width:34px;height:34px;border-radius:9px;background:var(--surface-2);border:1px solid var(--border);padding:2px}
+.brand b{display:block;font-size:14.5px;letter-spacing:-.01em}
+.brand span{display:block;font-size:12px;color:var(--text-3);margin-top:-1px}
+.navg{padding:6px 10px}
+.navg small{display:block;font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);padding:10px 10px 6px}
+#tabs button{display:flex;align-items:center;gap:11px;width:100%;background:none;border:0;border-radius:8px;padding:8px 10px;margin:1px 0;
+  color:var(--text-2);font-size:13.5px;font-weight:500;cursor:pointer;text-align:left;position:relative;transition:background .12s,color .12s}
+#tabs button:hover{background:var(--hover);color:var(--text)}
+#tabs button.on{background:var(--surface-2);color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
+#tabs button.on .i{color:var(--accent-text)}
+#tabs button.on:before{content:"";position:absolute;left:-10px;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:var(--accent)}
+#tabs .badge{margin-left:auto;font-size:11px;font-weight:600;min-width:20px;text-align:center;padding:1px 6px;border-radius:10px;background:var(--waiting-bg);color:var(--waiting)}
+.side-foot{margin-top:auto;padding:12px;border-top:1px solid var(--border)}
+.me{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px}
+.me .av{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--surface-2);border:1px solid var(--border);color:var(--text-2)}
+.me b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me span{display:block;font-size:11.5px;color:var(--text-3)}
+.me>div:last-child{min-width:0;flex:1}.me .av{flex:none}
+.side-lang{display:none;align-items:center;justify-content:space-between;padding:8px 10px}
+.side-link{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-top:4px;border-radius:8px;color:var(--text-2);font-size:13px}
+.side-link:hover{background:var(--hover);color:var(--text);text-decoration:none}
+
+.main{margin-left:var(--side-w);min-height:100vh;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:12px;height:60px;padding:0 28px;
+  background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--border)}
+.top h1{font-size:15px;font-weight:600;margin:0;letter-spacing:-.01em;white-space:nowrap}
+.crumb{display:flex;align-items:center;gap:8px;min-width:0;color:var(--text-3);font-size:13px}
+.crumb .sep{opacity:.5}
+.sp{flex:1}
+.chips{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden}
+.chip{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);
+  color:var(--text-2);font-size:12.5px;white-space:nowrap}
+.chip.ok{color:var(--text);border-color:var(--accent-line);background:var(--accent-soft)}
+.chip.off{color:var(--text-3)}
+.chip:empty{display:none}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none;background:var(--idle)}
+.dot.live{background:var(--accent);box-shadow:0 0 0 0 rgba(57,255,136,.6);animation:pulse 2s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 6px rgba(57,255,136,0)}100%{box-shadow:0 0 0 0 rgba(57,255,136,0)}}
+.vr{width:1px;height:22px;background:var(--border);flex:none}
+.iconbtn{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);cursor:pointer;transition:.12s}
+.iconbtn:hover{color:var(--text);border-color:var(--border-2)}
+#menuBtn{display:none}
+.content{padding:28px 28px 64px;width:100%;max-width:1240px;margin:0 auto}
+.tab{display:none;animation:fade .18s ease}.tab.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+
+/* ---------- tipografia e blocos ---------- */
+.phead{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:0 0 22px}
+.phead>div:first-child{flex:1;min-width:260px}
+.phead h2{font-size:22px;line-height:1.25;margin:0 0 6px;letter-spacing:-.02em;font-weight:650}
+.lead{color:var(--text-2);margin:0;max-width:680px;font-size:13.5px}
+.lead b{color:var(--text);font-weight:600}
+.over{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
+.card-h{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);min-height:52px}
+.card-h h3{margin:0;font-size:13.5px;font-weight:600;letter-spacing:-.005em}
+.card-h .sub{color:var(--text-3);font-size:12.5px}
+.card-b{padding:18px}
+.sec{margin-top:32px}
+.sec-h{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.sec-h h3{margin:0;font-size:14px;font-weight:600}
+.sec-h p{margin:0;color:var(--text-3);font-size:12.5px}
+.muted{color:var(--text-3)}
+code,kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+
+/* ---------- controles ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:32px;padding:0 13px;border-radius:8px;border:1px solid var(--border-2);
+  background:var(--surface-2);color:var(--text);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:background .12s,border-color .12s,transform .06s}
+.btn:hover{border-color:var(--text-3);background:var(--surface-3)}
+.btn:active{transform:translateY(1px)}
+.btn.pri{background:var(--accent);border-color:transparent;color:var(--accent-ink);font-weight:600}
+.btn.pri:hover{background:color-mix(in srgb,var(--accent) 88%,#fff);box-shadow:0 0 0 4px var(--accent-soft)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--text-2)}
+.btn.ghost:hover{background:var(--hover);color:var(--text)}
+.btn.danger{color:var(--error)}
+.btn.danger:hover{border-color:var(--error);background:var(--error-bg)}
+.btn:disabled,.btn[aria-disabled=true]{opacity:.55;cursor:default;transform:none;box-shadow:none}
+.btn.sm{height:28px;padding:0 10px;font-size:12.5px}
+.btn.cur{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-text)}
+select,input[type=text],input[type=number]{height:34px;background:var(--surface-2);border:1px solid var(--border-2);border-radius:8px;padding:0 10px;font-size:13px;transition:border-color .12s,box-shadow .12s;outline:0}
+select{padding-right:30px;appearance:none;-webkit-appearance:none;cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a93a6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 9px center;background-size:14px}
+select:hover,input[type=text]:hover,input[type=number]:hover{border-color:var(--text-3)}
+select:focus,input[type=text]:focus,input[type=number]:focus{border-color:var(--accent-line);box-shadow:var(--ring)}
+input[type=text]{width:240px}
+input::placeholder{color:var(--text-3)}
+.ig{display:inline-flex;align-items:stretch;border:1px solid var(--border-2);border-radius:8px;background:var(--surface-2);overflow:hidden;transition:border-color .12s,box-shadow .12s}
+.ig:hover{border-color:var(--text-3)}
+.ig:focus-within{border-color:var(--accent-line);box-shadow:var(--ring)}
+.ig input{border:0!important;box-shadow:none!important;background:transparent;width:72px;text-align:right;padding-right:6px}
+.ig span{display:grid;place-items:center;padding:0 10px;color:var(--text-3);font-size:12px;border-left:1px solid var(--border);background:var(--surface)}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.rng{display:flex;align-items:center;gap:10px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:160px;height:20px;background:transparent;cursor:pointer;--p:50%}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:4px;background:linear-gradient(90deg,var(--accent) var(--p),var(--surface-3) var(--p))}
+input[type=range]::-moz-range-track{height:4px;border-radius:4px;background:var(--surface-3)}
+input[type=range]::-moz-range-progress{height:4px;border-radius:4px;background:var(--accent)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;margin-top:-6px;border-radius:50%;background:#fff;border:0;box-shadow:0 0 0 1px rgba(0,0,0,.25),0 2px 6px rgba(0,0,0,.35)}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;border:0;box-shadow:0 0 0 1px rgba(0,0,0,.25),0 2px 6px rgba(0,0,0,.35)}
+input[type=range]:focus-visible{outline:0}input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:var(--ring)}
+.val{min-width:46px;text-align:center;font-size:12px;font-weight:600;padding:3px 7px;border-radius:6px;background:var(--surface-2);border:1px solid var(--border);color:var(--text)}
+.sw{position:relative;display:inline-block;width:36px;height:20px;flex:none}
+.sw input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1}
+.sw span{position:absolute;inset:0;background:var(--surface-3);border:1px solid var(--border-2);border-radius:20px;transition:.18s}
+.sw span:before{content:"";position:absolute;width:14px;height:14px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+.sw input:checked+span{background:var(--accent);border-color:transparent}
+.sw input:checked+span:before{transform:translateX(16px);background:#06180d}
+html[data-theme=light] .sw input:checked+span:before{background:#fff}
+.sw input:focus-visible+span{box-shadow:var(--ring)}
+.seg{display:inline-flex;gap:2px;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:3px}
+.seg button{background:none;border:0;color:var(--text-2);height:26px;padding:0 11px;border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:500;white-space:nowrap;transition:.12s}
+.seg button:hover{color:var(--text)}
+.seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.25),inset 0 0 0 1px var(--border-2)}
+html[data-theme=light] .seg button.on{box-shadow:0 1px 2px rgba(16,20,27,.12),inset 0 0 0 1px var(--border)}
+.seg.sm button{height:22px;padding:0 8px;font-size:11.5px;font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:20px;font-size:11.5px;font-weight:600;white-space:nowrap;background:var(--idle-bg);color:var(--idle)}
+.pill:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill.nodot:before{display:none}
+.pill.working{background:var(--working-bg);color:var(--working)}
+.pill.waiting{background:var(--waiting-bg);color:var(--waiting)}
+.pill.error,.pill.limit{background:var(--error-bg);color:var(--error)}
+.pill.ok{background:var(--accent-soft);color:var(--accent-text)}
+.pill.rot{background:var(--rot-bg);color:var(--rot)}
+.pill.llm{background:var(--llm-bg);color:var(--llm)}
+.pill.waiting:before{animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.3}}
+.meter{height:4px;border-radius:4px;background:var(--surface-3);overflow:hidden}
+.meter i{display:block;height:100%;border-radius:4px;background:var(--accent);transition:width .4s ease}
+
+/* ---------- visão geral ---------- */
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.kpi{padding:14px 16px 15px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi .over{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .over .i{color:var(--text-3)}
+.kpi .v{font-size:26px;font-weight:650;letter-spacing:-.02em;line-height:1.25;margin-top:6px;white-space:nowrap}
+.kpi .v small{font-size:14px;color:var(--text-3);font-weight:500;margin-left:2px}
+.kpi .s{font-size:12px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:18px}
+.kpi .meter{margin-top:8px}
+.kpi.warn .v{color:var(--waiting)}
+.kpi .accs{display:grid;gap:5px;margin-top:8px}
+.kpi .accs .ar{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(16px,1fr) 30px;gap:7px;align-items:center;font-size:11.5px;color:var(--text-3)}
+.kpi .accs .ar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .accs .ar em{font-style:normal;text-align:right;color:var(--text-2);font-variant-numeric:tabular-nums}
+.acct{display:inline-flex;align-items:center;gap:4px;color:var(--text-2)}
+.flist .fm input[type=text]{width:200px}
+.ov{display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:20px;align-items:start}
+.device{padding:18px 18px 16px}
+.bezel{position:relative;background:linear-gradient(160deg,#1a1e27,#07080b 60%);border-radius:16px;padding:12px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06),inset 0 1px 0 rgba(255,255,255,.08),0 18px 40px -18px rgba(0,0,0,.8)}
+.bezel:after{content:"";position:absolute;right:18px;bottom:5px;width:28px;height:2px;border-radius:2px;background:rgba(255,255,255,.08)}
+.bezel img,.shot img{width:100%;aspect-ratio:3/2;display:block;border-radius:5px;background:#000;object-fit:cover}
+.bezel img:not(.ld),.shot img:not(.ld){background:linear-gradient(100deg,#0b0d12 30%,#161a23 50%,#0b0d12 70%) 0 0/300% 100%;animation:shim 1.4s infinite linear}
+@keyframes shim{to{background-position:-150% 0}}
+.cap{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12.5px;color:var(--text-2)}
+.cap .muted{margin-left:auto;font-variant-numeric:tabular-nums}
+.qa{border-top:1px solid var(--border);margin-top:16px;padding-top:4px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:0;padding-bottom:0}
+.row .l{min-width:0;flex:1}
+.row .l b{font-weight:500;font-size:13.5px;display:block}
+.row .l small{display:block;color:var(--text-3);font-size:12px;margin-top:1px}
+.row .c{display:flex;align-items:center;gap:8px;flex:none}
+.outs{font-size:12px;color:var(--text-3);margin-top:10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.outs .o{padding:2px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);color:var(--text-2)}
+.slist{display:flex;flex-direction:column}
+.srow{display:grid;grid-template-columns:minmax(0,1fr) 120px 120px 64px 16px;align-items:center;gap:14px;width:100%;padding:12px 18px;
+  background:none;border:0;border-bottom:1px solid var(--border);text-align:left;cursor:pointer;transition:background .12s;position:relative}
+.srow:last-child{border-bottom:0}
+.srow:hover{background:var(--hover)}
+.srow:before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:2px;border-radius:2px;background:transparent}
+.srow.working:before{background:var(--working)}.srow.waiting:before{background:var(--waiting)}.srow.error:before,.srow.limit:before{background:var(--error)}
+.srow .t{min-width:0}
+.srow .t b{display:flex;align-items:center;gap:7px;font-weight:550;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow .t b span.n{overflow:hidden;text-overflow:ellipsis}
+.srow .t small{display:flex;align-items:center;gap:6px;color:var(--text-3);font-size:12px;margin-top:3px;white-space:nowrap;overflow:hidden}
+.srow .ctx{display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--text-3)}
+.srow .ag{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--text-2);justify-content:flex-end}
+.srow .ag.z{color:var(--text-3);opacity:.6}
+.srow>.i{color:var(--text-3)}
+.thead{display:grid;grid-template-columns:minmax(0,1fr) 120px 120px 64px 16px;gap:14px;padding:9px 18px;border-bottom:1px solid var(--border);background:var(--surface-2);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);font-weight:600}
+.thead span:nth-child(4){text-align:right}
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:36px 24px;color:var(--text-3);font-size:13px}
+.empty img{width:52px;height:52px;opacity:.9;margin-bottom:6px;filter:drop-shadow(0 6px 16px rgba(57,255,136,.18))}
+.empty b{color:var(--text);font-size:14px;font-weight:600}
+.sk{display:inline-block;height:1em;width:60px;border-radius:6px;background:linear-gradient(100deg,var(--surface-2) 30%,var(--surface-3) 50%,var(--surface-2) 70%) 0 0/300% 100%;animation:shim 1.4s infinite linear;vertical-align:middle}
+
+/* ---------- galerias (layouts, cenas) ---------- */
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.toolbar label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2)}
+.status-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-2);padding:10px 14px;border:1px solid var(--border);background:var(--surface);border-radius:10px;margin-bottom:18px}
+.status-line .i{color:var(--text-3)}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px}
+.gi{display:flex;flex-direction:column;overflow:hidden;transition:border-color .15s,box-shadow .15s,transform .15s}
+.gi:hover{border-color:var(--border-2);transform:translateY(-1px)}
+.gi.sel{border-color:var(--accent-line);box-shadow:0 0 0 1px var(--accent-line),var(--shadow)}
+.gi.rot{border-color:color-mix(in srgb,var(--rot) 45%,transparent)}
+.shot{position:relative;padding:10px;background:linear-gradient(180deg,#0c0e13,#06070a);border-bottom:1px solid var(--border)}
+html[data-theme=light] .shot{background:linear-gradient(180deg,#1b1f28,#0e1016)}
+.gi .gb{padding:14px 16px 0;flex:1}
+.gi h4 .sp{flex:1}.gi h4{min-height:22px;margin:0 0 4px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.gi h4 .idx{font:600 11px var(--mono);color:var(--text-3);border:1px solid var(--border);border-radius:5px;padding:1px 5px}
+.gi p{margin:0;color:var(--text-2);font-size:12.5px;line-height:1.5}
+.gi .ga{display:flex;align-items:center;gap:8px;padding:14px 16px 16px}
+.gi .ga .sp{flex:1}
+.mini-sw{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-2);cursor:pointer;user-select:none}
+
+/* ---------- formulários (comportamento, alertas) ---------- */
+.fgroups{display:flex;flex-direction:column;gap:0}
+.fg{display:grid;grid-template-columns:260px minmax(0,1fr);gap:28px;padding:26px 0;border-top:1px solid var(--border)}
+.fg:first-child{border-top:0;padding-top:4px}
+.fg .gh h3{margin:0 0 6px;font-size:14px;font-weight:600}
+.fg .gh p{margin:0;color:var(--text-3);font-size:12.5px;line-height:1.55}
+.fg .card{padding:4px 18px}
+.fg .row{padding:14px 0}
+.fg .row .c input[type=text]{width:260px}
+.fg .extra{display:flex;gap:8px;flex-wrap:wrap;padding:14px 0 12px;border-top:1px solid var(--border)}
+.savest{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-3);height:30px;padding:0 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface)}
+.savest.busy .i{animation:spin 1s linear infinite}
+.savest.ok{color:var(--accent-text);border-color:var(--accent-line)}
+.savest.bad{color:var(--error);border-color:var(--error)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.zone{display:flex;align-items:center;gap:16px;justify-content:space-between;padding:16px 18px}
+.zone b{display:block;font-weight:600;font-size:13.5px}
+.zone small{color:var(--text-3);font-size:12.5px}
+.alist{display:flex;flex-direction:column}
+.al{display:flex;gap:12px;align-items:flex-start;padding:12px 18px;border-bottom:1px solid var(--border)}
+.al:last-child{border-bottom:0}
+.al .ic{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;flex:none;background:var(--waiting-bg);color:var(--waiting)}
+.al .ic.done{background:var(--accent-soft);color:var(--accent-text)}
+.al b{display:block;font-size:13px;font-weight:550}
+.al small{color:var(--text-3);font-size:12px}
+.al time{margin-left:auto;font-size:12px;color:var(--text-3);white-space:nowrap}
+
+/* ---------- histórico ---------- */
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart .gl{stroke:var(--border);stroke-dasharray:2 4}
+.chart .ax{fill:var(--text-3);font-size:11px;font-family:inherit}
+.chart .hc{fill:var(--hover)}
+.lg{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-2)}
+.lg span{display:inline-flex;align-items:center;gap:7px}
+.lg i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.hgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:18px}
+.hb{display:flex;flex-direction:column;gap:12px}
+.hb .r{display:grid;grid-template-columns:22px minmax(0,150px) minmax(0,1fr) 64px;gap:10px;align-items:center;font-size:13px}
+.hb .r em{font:normal 600 11px var(--mono);color:var(--text-3);text-align:right}
+.hb .r span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+.hb .r .tr{height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.hb .r .tr i{display:block;height:100%;border-radius:4px;background:var(--working);min-width:3px}
+.hb .r b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.ttip{position:fixed;pointer-events:none;background:var(--surface);color:var(--text);border:1px solid var(--border-2);border-radius:10px;padding:10px 12px;font-size:12px;
+  display:none;z-index:80;box-shadow:var(--shadow-lg);min-width:170px}
+.ttip b{display:block;margin-bottom:6px;font-size:12.5px}
+.ttip .tr{display:flex;align-items:center;gap:8px;margin:3px 0}
+.ttip .tr i{width:8px;height:8px;border-radius:2px}
+.ttip .tr span{flex:1;color:var(--text-2)}
+.ttip .tr em{font-style:normal;font-weight:600;font-variant-numeric:tabular-nums}
+.ttip .ft{border-top:1px solid var(--border);margin-top:7px;padding-top:7px;color:var(--text-3)}
+
+/* ---------- máquinas ---------- */
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:18px}
+.mc{display:flex;flex-direction:column}
+.mc.down{opacity:.78}
+.mh{display:flex;align-items:center;gap:12px;padding:16px 18px}
+.mh .av{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;flex:none;border:1px solid var(--border)}
+.mh b{font-size:14.5px;font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mh small{display:block;color:var(--text-3);font-size:12px}
+.mh>div{min-width:0;flex:1}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.stats div{padding:12px 18px;border-left:1px solid var(--border)}
+.stats div:first-child{border-left:0}
+.stats b{display:block;font-size:18px;font-weight:650;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.stats small{font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+.res{padding:14px 18px 4px;display:grid;gap:10px}
+.res .rl{display:grid;grid-template-columns:52px minmax(0,1fr) 92px;gap:10px;align-items:center;font-size:12.5px}
+.res .rl span{color:var(--text-3)}
+.res .rl em{font-style:normal;text-align:right;color:var(--text-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mset{padding:4px 18px 8px}
+.mset .row{padding:11px 0}
+.mset a{font-size:12.5px;word-break:break-all}
+input[type=color]{-webkit-appearance:none;appearance:none;width:34px;height:26px;padding:2px;border:1px solid var(--border-2);border-radius:7px;background:var(--surface-2);cursor:pointer}
+input[type=color]::-webkit-color-swatch-wrapper{padding:0}input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
+input[type=color]::-moz-color-swatch{border:0;border-radius:4px}
+.flist .fm{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--border)}
+.flist .fm:last-child{border-bottom:0}
+.flist .fm .av{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:var(--working-bg);color:var(--working);flex:none}
+.flist .fm>div{flex:1;min-width:0}
+.flist .fm b{font-weight:600}
+.flist .fm small{display:block;color:var(--text-3);font-size:12px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.pair .card-b>p{margin:0 0 16px;color:var(--text-2);font-size:13px}
+.codebox{display:flex;align-items:center;gap:6px;margin:4px 0 12px}
+.codebox span{width:44px;height:54px;display:grid;place-items:center;font:600 26px var(--mono);border-radius:10px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--accent-text)}
+.codebox .gap{width:10px;background:none;border:0}
+.codemeta{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--text-2);margin-bottom:14px}
+.codemeta .meter{flex:1;max-width:220px}
+.codeph{display:flex;align-items:center;gap:12px;padding:16px;border:1px dashed var(--border-2);border-radius:10px;color:var(--text-3);font-size:12.5px;margin-bottom:14px}
+.codeph .i{width:22px;height:22px}
+.fld{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.fld label{font-size:12px;font-weight:600;color:var(--text-2)}
+.fld input[type=text]{width:100%}
+.fld input.cd{font:600 20px var(--mono);letter-spacing:.3em;height:46px;width:190px;text-align:center}
+.msg{font-size:12.5px;min-height:18px;color:var(--error);margin-top:10px}
+.msg.okm{color:var(--text-2)}
+.msg.okm b{color:var(--text)}
+.copyrow{display:flex;gap:8px;align-items:center}
+.copyrow input{flex:1;width:auto;font-family:var(--mono);font-size:12px;color:var(--text-2)}
+.acc .fld{margin-bottom:16px}
+.note{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);font-size:12.5px}
+.note .i{color:var(--text-3);margin-top:1px}
+.note.warn{background:var(--waiting-bg);border-color:transparent;color:var(--waiting)}
+.note.warn .i{color:var(--waiting)}
+
+/* ---------- sobre ---------- */
+.hero{display:flex;align-items:center;gap:22px;padding:26px 28px;overflow:hidden;position:relative}
+.hero:after{content:"";position:absolute;right:-80px;top:-120px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(57,255,136,.14),transparent 65%);pointer-events:none}
+.hero img{width:76px;height:76px;border-radius:18px;background:var(--surface-2);border:1px solid var(--border);padding:6px}
+.hero h2{margin:0 0 4px;font-size:22px;letter-spacing:-.02em}
+.hero p{margin:0;color:var(--text-2);max-width:640px}
+.hero .meta{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.dg{width:100%;height:auto;display:block}
+.dg .bx{fill:var(--surface-2);stroke:var(--border-2)}
+.dg .bx.a{stroke:var(--accent-line);fill:var(--accent-soft)}
+.dg .t1{fill:var(--text);font-size:13px;font-weight:600}
+.dg .t2{fill:var(--text-3);font-size:11px}
+.dg .ln{stroke:var(--text-3);stroke-width:1.4;fill:none}
+.dg .ln.d{stroke-dasharray:3 4}
+.dg .ah{fill:var(--text-3)}
+.comps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:18px}
+.multi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+@media(max-width:1100px){.multi{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.multi{grid-template-columns:1fr}}
+.comp{padding:16px}
+.comp .ic{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);margin-bottom:12px}
+.comp b{display:block;font-size:13.5px;margin-bottom:4px}
+.comp p{margin:0;color:var(--text-2);font-size:12.5px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
+.prose p{margin:0 0 10px;color:var(--text-2);font-size:13.5px}.prose p:last-child{margin:0}
+.prose b{color:var(--text)}
+.links{display:flex;flex-direction:column}
+.links a{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);color:var(--text);font-size:13.5px}
+.links a:last-child{border-bottom:0}
+.links a:hover{text-decoration:none;color:var(--accent-text)}
+.links a .i{color:var(--text-3)}
+.links a span{flex:1}
+.fine{color:var(--text-3);font-size:12px;margin-top:22px}
+
+/* ---------- gaveta, toast ---------- */
+.scrim{position:fixed;inset:0;background:rgba(3,5,8,.55);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .2s;z-index:60}
+.scrim.on{opacity:1;pointer-events:auto}
+html[data-theme=light] .scrim{background:rgba(16,20,27,.28)}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100%);background:var(--surface);border-left:1px solid var(--border);box-shadow:var(--shadow-lg);
+  z-index:70;transform:translateX(102%);transition:transform .24s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
+#drawer.on{transform:none}
+.dh{display:flex;align-items:flex-start;gap:12px;padding:18px 20px;border-bottom:1px solid var(--border)}
+.dh>div{flex:1;min-width:0}
+.dh h3{margin:0 0 8px;font-size:16px;font-weight:600;letter-spacing:-.01em;word-break:break-word}
+.db{padding:6px 20px 28px;overflow:auto;flex:1}
+.props{display:grid;grid-template-columns:130px minmax(0,1fr);margin:6px 0 4px}
+.props dt,.props dd{padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;margin:0}
+.props dt{color:var(--text-3)}
+.props dd{word-break:break-word}
+.db h4{margin:22px 0 10px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);font-weight:600;display:flex;gap:8px;align-items:center}
+.agents{display:flex;flex-direction:column;gap:6px}
+.agents div{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:9px;background:var(--surface-2);font-size:13px}
+.agents div b{font-weight:600}
+.agents div span{margin-left:auto;color:var(--text-2);font-size:12px}
+.tl{position:relative;padding-left:18px}
+.tl:before{content:"";position:absolute;left:4px;top:6px;bottom:6px;width:1px;background:var(--border-2)}
+.tl div{position:relative;display:flex;gap:12px;padding:5px 0;font-size:12.5px}
+.tl div:before{content:"";position:absolute;left:-17px;top:11px;width:7px;height:7px;border-radius:50%;background:var(--surface);border:1.5px solid var(--text-3)}
+.tl small{color:var(--text-3);min-width:64px;font-variant-numeric:tabular-nums}
+#toast{position:fixed;right:24px;bottom:24px;display:flex;align-items:center;gap:10px;max-width:min(420px,calc(100% - 32px));background:var(--surface);color:var(--text);
+  border:1px solid var(--border-2);border-radius:10px;padding:10px 14px;font-size:13px;box-shadow:var(--shadow-lg);z-index:90;
+  transform:translateY(16px);opacity:0;pointer-events:none;transition:transform .2s,opacity .2s}
+#toast.show{transform:none;opacity:1}
+#toast .ic{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent-text);flex:none}
+#toast.bad .ic{background:var(--error-bg);color:var(--error)}
+
+/* ---------- responsivo ---------- */
+@media (max-width:1320px){.ov{grid-template-columns:1fr}.ov .device{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:22px;align-items:start}
+  .ov .device .qa{margin-top:0;border-top:0;padding-top:0}}
+@media (max-width:1200px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.comps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:1100px){:root{--side-w:220px}.top .hosts{display:none}.fg{grid-template-columns:200px minmax(0,1fr);gap:20px}
+  .hgrid{grid-template-columns:1fr}.srow,.thead{grid-template-columns:minmax(0,1fr) 110px 96px 56px 16px}.content{padding:24px 24px 56px}}
+@media (max-width:900px){.ov .device{display:block}.ov .device .qa{margin-top:16px;border-top:1px solid var(--border);padding-top:4px}
+  .fg{grid-template-columns:1fr;gap:12px}.pair,.two{grid-template-columns:1fr}}
+@media (max-width:860px){
+  .side{transform:translateX(-100%);box-shadow:var(--shadow-lg);z-index:62}
+  body.nav-open .side{transform:none}
+  .main{margin-left:0}
+  #menuBtn{display:grid}
+  .top{padding:0 14px;gap:10px}
+  .crumb .pre,.crumb .sep{display:none}
+  .content{padding:18px 14px 80px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .kpi{padding:12px 14px}.kpi .v{font-size:22px}
+  .thead{display:none}
+  .srow{grid-template-columns:minmax(0,1fr) auto 16px;gap:10px;padding:12px 14px}
+  .srow .ctx{display:none}
+  .srow .st{grid-column:2;grid-row:1}
+  .srow .ag{display:none}
+  .ov>.card:last-child{order:-1}
+  .gal{grid-template-columns:1fr}
+  .mgrid{grid-template-columns:1fr}
+  .phead h2{font-size:19px}
+  .row{flex-wrap:wrap}
+  .fg .row .c input[type=text]{width:100%}
+  .fg .row .c{max-width:100%}
+  .hb .r{grid-template-columns:18px minmax(0,110px) minmax(0,1fr) 54px}
+  .comps{grid-template-columns:1fr}
+  .hero{flex-direction:column;align-items:flex-start;padding:20px}
+  #toast{right:16px;bottom:16px}
+  .chip.scr{max-width:44vw;overflow:hidden;text-overflow:ellipsis}
+  .chip.scr span{overflow:hidden;text-overflow:ellipsis}
+  .codebox span{width:38px;height:48px;font-size:22px}
+}
+@media (max-width:480px){.top .lang{display:none}.side-lang{display:flex}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<aside class="side" id="side" aria-label="Navegação">
+  <div class="brand"><img src="img/icon.png" alt=""><div><b>Byorzin Monitor</b><span data-en="Claude Code on one screen">Claude Code numa tela só</span></div></div>
+  <nav id="tabs">
+    <div class="navg"><small data-en="Monitor">Monitor</small>
+      <button data-t="tela"><span data-ic="overview"></span><span data-en="Overview">Visão geral</span><span class="badge" id="navWait" hidden></span></button>
+      <button data-t="layouts"><span data-ic="layouts"></span><span>Layouts</span></button>
+      <button data-t="cenas"><span data-ic="scenes"></span><span data-en="Scenes">Cenas</span></button>
+      <button data-t="historico"><span data-ic="history"></span><span data-en="History">Histórico</span></button>
+    </div>
+    <div class="navg"><small data-en="Settings">Configuração</small>
+      <button data-t="ajustes"><span data-ic="sliders"></span><span data-en="Behavior">Comportamento</span></button>
+      <button data-t="alertas"><span data-ic="bell"></span><span data-en="Alerts">Alertas</span></button>
+      <button data-t="maquinas"><span data-ic="machines"></span><span data-en="Machines">Máquinas</span></button>
+      <button data-t="sobre"><span data-ic="info"></span><span data-en="About">Sobre</span></button>
+    </div>
+  </nav>
+  <div class="side-foot">
+    <a class="side-link" href="tela" target="_blank" rel="noopener"><span data-ic="external"></span><span data-en="Open the screen (/tela)">Abrir a tela (/tela)</span></a>
+    <div class="side-lang"><span class="over" data-en="Language">Idioma</span><span class="seg sm langseg" role="group" aria-label="Idioma / Language"><button data-l="pt-BR">PT</button><button data-l="en">EN</button></span></div>
+    <div class="me"><div class="av"><span data-ic="cpu"></span></div><div><b id="pMach"><span class="sk"></span></b><span id="pVer" data-en="this panel">este painel</span></div></div>
+  </div>
+</aside>
+<div class="scrim" id="navScrim" data-act="nav-close"></div>
+
+<div class="main">
+<header class="top">
+  <button class="iconbtn" id="menuBtn" aria-label="Menu" data-act="nav-open"><span data-ic="menu"></span></button>
+  <div class="crumb"><span class="pre">Byorzin Monitor</span><span class="sep">/</span><h1 id="secTitle"></h1></div>
+  <span class="sp"></span>
+  <div class="chips"><span id="pScreen" class="chip scr"></span><span class="chips hosts" id="pHosts"></span></div>
+  <span class="vr hosts"></span>
+  <span class="seg sm lang langseg" id="langSeg" role="group" aria-label="Idioma / Language"><button data-l="pt-BR">PT</button><button data-l="en">EN</button></span>
+  <button class="iconbtn" id="themeBtn" aria-label="Tema / Theme" title="Tema / Theme"><span id="themeIc"></span></button>
+</header>
+
+<main class="content">
+<!-- VISÃO GERAL -->
+<section class="tab" id="t-tela">
+  <div class="kpis">
+    <div class="card kpi"><span class="over"><span data-ic="activity" class="ic"></span><span data-en="Active sessions">Sessões ativas</span></span><div class="v num" id="kAct"><span class="sk"></span></div><div class="meter"><i id="kActB" style="width:0"></i></div></div>
+    <div class="card kpi" id="kWaitBox"><span class="over"><span data-ic="hand"></span><span data-en="Waiting for you">Esperando você</span></span><div class="v num" id="kWait"><span class="sk"></span></div><div class="s" id="kWaitS"></div></div>
+    <div class="card kpi"><span class="over"><span data-ic="agents"></span><span data-en="Agents running">Agentes rodando</span></span><div class="v num" id="kAg"><span class="sk"></span></div><div class="s" data-en="subagents in all sessions">subagentes em todas as sessões</div></div>
+    <div class="card kpi"><span class="over"><span data-ic="coins"></span><span data-en="Tokens today">Tokens hoje</span></span><div class="v num" id="kTok"><span class="sk"></span></div><div class="s" id="kTokS"></div></div>
+    <div class="card kpi"><span class="over"><span data-ic="calendar"></span><span data-en="Weekly limit">Limite semanal</span></span><div class="v num" id="kWeek"><span class="sk"></span></div><div class="meter"><i id="kWeekB" style="width:0"></i></div><div class="accs" id="kWeekA" hidden></div></div>
+    <div class="card kpi"><span class="over"><span data-ic="clock"></span><span data-en="5h window">Janela de 5h</span></span><div class="v num" id="kFive"><span class="sk"></span></div><div class="meter"><i id="kFiveB" style="width:0"></i></div><div class="accs" id="kFiveA" hidden></div></div>
+  </div>
+  <div class="ov">
+    <div class="card device">
+      <div class="card-top">
+        <div class="bezel"><img id="now" alt=""></div>
+        <div class="cap"><span class="dot" id="nowDot"></span><span id="nowWhere"></span><span class="muted" id="nowTime"></span></div>
+      </div>
+      <div class="qa">
+        <div class="row"><div class="l"><b data-en="Layout">Layout</b><small data-en="what the screen shows while there are sessions">o que a tela mostra enquanto há sessões</small></div><div class="c"><select id="qLayout" aria-label="Layout"></select></div></div>
+        <div class="row"><div class="l"><b data-en="Brightness">Brilho</b><small data-en="daytime, saved and replicated">de dia, salvo e replicado</small></div><div class="c rng"><input type="range" id="qBright" min="5" max="100" step="5" aria-label="Brilho"><span class="val num" id="qBrightV"></span></div></div>
+        <div class="row"><div class="l"><b data-en="Screen in the browser">Tela no navegador</b><small data-en="kiosk, tablet or second monitor">quiosque, tablet ou segundo monitor</small></div><div class="c"><a class="btn sm" href="tela" target="_blank" rel="noopener"><span data-ic="external" class="sm"></span><span data-en="Open /tela">Abrir /tela</span></a></div></div>
+        <div class="outs" id="telaOpts"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3 data-en="Sessions on screen">Sessões na tela</h3><span class="sub num" id="sessCount"></span><span class="sp"></span><span id="hiddenNote" class="pill nodot" hidden></span></div>
+      <div class="thead"><span data-en="Session">Sessão</span><span data-en="Status">Status</span><span data-en="Context">Contexto</span><span data-en="Agents">Agentes</span><span></span></div>
+      <div class="slist" id="sessList"><div class="empty"><span class="sk" style="width:60%"></span><span class="sk" style="width:40%"></span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- LAYOUTS -->
+<section class="tab" id="t-layouts">
+  <div class="phead">
+    <div><h2 data-en="Work mode layouts">Layouts do modo trabalho</h2>
+    <p class="lead" data-en="What the screen shows while sessions are open. &lt;b&gt;Use&lt;/b&gt; pins one layout; turn &lt;b&gt;rotate&lt;/b&gt; on for two or more and the screen switches on its own. &lt;b&gt;Test&lt;/b&gt; shows it on the real screen for 15 s.">É o que a tela mostra enquanto há sessões abertas. <b>Usar</b> fixa um layout; ligue <b>alternar</b> em dois ou mais para a tela trocar sozinha. <b>Testar</b> mostra na tela real por 15 s.</p></div>
+    <div class="toolbar">
+      <span class="seg" id="dataSeg" role="group"><button data-d="demo" class="on" data-en="Demo scenario">Cenário demo</button><button data-d="demo2" data-en="Demo: 2 accounts">Demo: 2 contas</button><button data-d="real" data-en="My data">Meus dados</button></span>
+      <label><span data-en="Switch every">Trocar a cada</span> <span class="ig"><input type="number" id="qRot" min="10" max="600" aria-label="segundos"><span>s</span></span></label>
+    </div>
+  </div>
+  <div class="status-line" id="layState"></div>
+  <div class="gal" id="lgrid"></div>
+</section>
+
+<!-- CENAS -->
+<section class="tab" id="t-cenas">
+  <div class="phead"><div><h2 data-en="Scenes">Cenas</h2>
+    <p class="lead" data-en="What shows up outside work mode: the idle Byorzin, alerts and celebrations. The previews use the scenario chosen in Layouts (demo or your data).">O que aparece fora do modo trabalho: o Byorzin ocioso, os alertas e as comemorações. As prévias usam o cenário escolhido em Layouts (demo ou seus dados).</p></div></div>
+  <div class="gal" id="sgrid"></div>
+</section>
+
+<!-- HISTÓRICO -->
+<section class="tab" id="t-historico">
+  <div class="phead">
+    <div><h2 data-en="History">Histórico</h2>
+    <p class="lead" data-en="Summed over all machines. Each collector keeps ~90 days of aggregates (tokens, sessions, tools and agents), never conversation content.">Somando todas as máquinas. Cada coletor guarda ~90 dias de agregados (tokens, sessões, ferramentas e agentes), nunca conteúdo das conversas.</p></div>
+    <div class="toolbar"><span id="histErr" class="pill error" hidden></span>
+      <span class="seg" id="histSeg" role="group"><button data-n="7" data-en="7 days">7 dias</button><button data-n="30" class="on" data-en="30 days">30 dias</button><button data-n="90" data-en="90 days">90 dias</button></span></div>
+  </div>
+  <div class="kpis" id="histKpi"></div>
+  <div class="card">
+    <div class="card-h"><h3 data-en="Tokens per day">Tokens por dia</h3><span class="sub" data-en="stacked by machine">empilhado por máquina</span><span class="sp"></span><div class="lg" id="histLg"></div></div>
+    <div class="card-b chart" id="histTok"></div>
+  </div>
+  <div class="hgrid">
+    <div class="card"><div class="card-h"><h3 data-en="By machine">Por máquina</h3><span class="sub">tokens</span></div><div class="card-b hb" id="histHost"></div></div>
+    <div class="card"><div class="card-h"><h3 data-en="By model">Por modelo</h3><span class="sub">tokens</span></div><div class="card-b hb" id="histModel"></div></div>
+    <div class="card"><div class="card-h"><h3 data-en="Most used tools">Ferramentas mais usadas</h3><span class="sub" data-en="calls">chamadas</span></div><div class="card-b hb" id="histTools"></div></div>
+    <div class="card"><div class="card-h"><h3 data-en="Agents started">Agentes iniciados</h3><span class="sub" data-en="by type">por tipo</span></div><div class="card-b hb" id="histAgents"></div></div>
+  </div>
+</section>
+
+<!-- COMPORTAMENTO -->
+<section class="tab" id="t-ajustes">
+  <div class="phead">
+    <div><h2 data-en="Behavior">Comportamento</h2>
+    <p class="lead" data-en="How the screen and the Byorzin behave. Every change is saved right away and copied to the other machines, so the screen acts the same wherever it is plugged in.">Como a tela e o Byorzin se comportam. Cada mudança é salva na hora e copiada para as outras máquinas, então a tela age igual onde estiver plugada.</p></div>
+    <div class="toolbar"><span class="savest" data-save></span></div>
+  </div>
+  <div class="fgroups" id="form"></div>
+  <div class="sec">
+    <div class="card zone"><div><b data-en="Restore defaults">Restaurar padrões</b><small data-en="Puts every setting back to its default value (colors, hidden machines and language are kept).">Volta todos os ajustes para o valor padrão (cores, máquinas ocultas e idioma são mantidos).</small></div>
+    <button class="btn danger" id="btnReset"><span data-ic="reset" class="sm"></span><span data-en="Restore">Restaurar</span></button></div>
+  </div>
+</section>
+
+<!-- ALERTAS -->
+<section class="tab" id="t-alertas">
+  <div class="phead">
+    <div><h2 data-en="Alerts">Alertas</h2>
+    <p class="lead" data-en="How the Byorzin calls you when a session waits for permission or an answer, when a long job finishes and when usage nears the limit: on the screen, in this browser and on your phone.">Como o Byorzin chama você quando uma sessão espera permissão ou resposta, quando um trabalho longo termina e quando o uso chega perto do limite: na tela, neste navegador e no celular.</p></div>
+    <div class="toolbar"><span class="savest" data-save></span></div>
+  </div>
+  <div class="fgroups" id="alertForm"></div>
+  <div class="sec">
+    <div class="sec-h"><h3 data-en="Recent alerts">Alertas recentes</h3><p data-en="from every machine">de todas as máquinas</p></div>
+    <div class="card alist" id="alertList"></div>
+  </div>
+</section>
+
+<!-- MÁQUINAS -->
+<section class="tab" id="t-maquinas">
+  <div class="phead"><div><h2 data-en="Machines">Máquinas</h2>
+    <p class="lead" data-en="Each computer runs a collector; the screen shows the sessions of all of them. Machines that are down stay here, dimmed, with the time of last contact. Choose each one's Byorzin color and whether its sessions show up.">Cada computador roda um coletor; a tela mostra as sessões de todos. Máquinas fora do ar continuam aqui, apagadas, com a hora do último contato. Escolha a cor do Byorzin de cada uma e se as sessões dela aparecem.</p></div></div>
+  <div class="sec-h"><h3 data-en="Paired">Pareadas</h3><p id="pairedCount" class="num"></p></div>
+  <div class="mgrid" id="mgrid"></div>
+
+  <div class="sec" id="acctSec" hidden>
+    <div class="sec-h"><h3 data-en="Accounts">Contas</h3><p data-en="Claude accounts seen on the machines; each one has its own usage limits">contas do Claude vistas nas máquinas; cada uma tem os seus limites de uso</p></div>
+    <div class="card flist" id="acctList"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><h3 data-en="Found on the network">Encontradas na rede</h3><span class="pill nodot" id="discNote"></span></div>
+    <div class="card flist" id="fgrid"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><h3 data-en="Pair with another machine">Parear com outra máquina</h3><p data-en="no tokens copied by hand">sem copiar token na mão</p></div>
+    <div class="pair">
+      <div class="card"><div class="card-h"><span data-ic="key"></span><h3 data-en="Generate a code here">Gerar código aqui</h3></div><div class="card-b">
+        <p data-en="A 6-digit, single-use code valid for 5 minutes. Type it on the other machine, in its panel or with &lt;code&gt;byorzin-monitor pair &amp;lt;ip&amp;gt; &amp;lt;code&amp;gt;&lt;/code&gt;.">Um código de 6 dígitos, de uso único, válido por 5 minutos. Digite-o na outra máquina, no painel dela ou com <code>byorzin-monitor pair &lt;ip&gt; &lt;código&gt;</code>.</p>
+        <div id="codeBox"></div>
+        <div class="toolbar"><button class="btn pri" id="btnCode"><span data-ic="key" class="sm"></span><span data-en="Generate code">Gerar código</span></button><button class="btn ghost" id="btnCancel" hidden data-en="Cancel">Cancelar</button></div>
+        <div class="msg" id="codeErr"></div>
+      </div></div>
+      <div class="card"><div class="card-h"><span data-ic="link"></span><h3 data-en="I have a code">Tenho um código</h3></div><div class="card-b">
+        <p data-en="Generate the code in the other machine's panel and type it here. This machine joins that group and starts using its token.">Gere o código no painel da outra máquina e digite aqui. Esta máquina entra no grupo dela e passa a usar o token do grupo.</p>
+        <div class="fld"><label for="joinTarget" data-en="Panel address">Endereço do painel</label><input type="text" id="joinTarget" placeholder="192.168.1.10:8788" autocomplete="off"></div>
+        <div class="fld"><label for="joinCode" data-en="Code">Código</label><div class="toolbar"><input type="text" class="cd" id="joinCode" placeholder="000000" maxlength="7" inputmode="numeric" autocomplete="one-time-code">
+          <button class="btn pri" id="btnJoin" data-en="Pair">Parear</button></div></div>
+        <div class="msg okm" id="joinErr"></div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><h3 data-en="Access from another device">Acesso de outro aparelho</h3><p data-en="phone, tablet or another computer">celular, tablet ou outro computador</p></div>
+    <div class="card acc" id="linkBox" hidden><div class="card-b">
+      <p class="lead" style="margin-bottom:16px" data-en="Open this link once on the device: it remembers the access (cookie). It carries the panel key, not the group token; share it only with your own devices.">Abra este link uma vez no aparelho: ele lembra o acesso (cookie). O link leva a chave do painel, não o token do grupo; passe só para aparelhos seus.</p>
+      <div class="fld"><label for="linkUrl" data-en="Full panel">Painel completo</label><div class="copyrow"><input type="text" id="linkUrl" readonly><button class="btn" id="linkCopy"><span data-ic="copy" class="sm"></span><span data-en="Copy">Copiar</span></button></div></div>
+      <div class="fld"><label for="linkTela" data-en="Screen only (/tela, kiosk)">Só a tela (/tela, quiosque)</label><div class="copyrow"><input type="text" id="linkTela" readonly><button class="btn" id="linkCopyTela"><span data-ic="copy" class="sm"></span><span data-en="Copy">Copiar</span></button></div></div>
+      <div class="toolbar"><button class="btn danger" id="linkRotate"><span data-ic="reset" class="sm"></span><span data-en="Generate a new key">Gerar nova chave</span></button>
+        <span class="muted" style="font-size:12.5px" data-en="devices that already signed in will need the new link">os aparelhos que já entraram vão precisar do link novo</span></div>
+      <div class="note warn" id="linkOff" hidden style="margin-top:14px"><span data-ic="alert"></span><span data-en="panel_auth = off: the panel is open to the whole network.">panel_auth = off: o painel está aberto para toda a rede.</span></div>
+    </div></div>
+    <div class="note" id="linkNote" hidden><span data-ic="lock"></span><span data-en="For safety, the access link is only shown in the browser of the panel's own machine (or run &lt;code&gt;byorzin-monitor panel-url&lt;/code&gt; there).">Por segurança, o link de acesso só aparece no navegador da própria máquina do painel (ou rode <code>byorzin-monitor panel-url</code> nela).</span></div>
+  </div>
+</section>
+
+<!-- SOBRE -->
+<section class="tab" id="t-sobre">
+  <div class="card hero"><img src="img/icon.png" alt="Byorzin"><div>
+    <h2>Byorzin Monitor</h2>
+    <p data-en="A &lt;b&gt;shared agent monitor&lt;/b&gt;: every computer where you use Claude Code runs a small collector, and &lt;b&gt;one screen shows the sessions and subagents of all of them&lt;/b&gt; — a tiny USB display, any browser, a terminal or a framebuffer. Each session becomes a Byorzin that works, calls agents and asks for your attention; when nobody is using it, it naps, sleeps and dreams about your statistics.">Um <b>monitor compartilhado de agentes</b>: cada computador onde você usa o Claude Code roda um pequeno coletor, e <b>uma única tela mostra as sessões e os subagentes de todos eles</b> — uma telinha USB, qualquer navegador, um terminal ou um framebuffer. Cada sessão vira um Byorzin que trabalha, chama agentes e pede a sua atenção; quando ninguém está usando, ele cochila, dorme e sonha com as suas estatísticas.</p>
+    <div class="meta"><span class="pill ok nodot num" id="aboutVer"></span><span class="pill nodot num" id="aboutMach"></span><span class="pill nodot" data-en="MIT license (code)">licença MIT (código)</span><span class="pill nodot" data-en="local network only">só rede local</span></div>
+  </div></div>
+
+  <div class="sec">
+    <div class="sec-h"><h3 data-en="Many computers, one screen">Vários computadores, uma tela</h3></div>
+    <div class="multi">
+      <div class="card comp"><div class="ic"><span data-ic="machines"></span></div><b data-en="A collector on each computer">Um coletor em cada computador</b><p data-en="Notebook, desktop, server, a remote machine: each one runs its own collector, always on, reading only the local Claude Code sessions.">Notebook, desktop, servidor, máquina remota: cada um roda o seu coletor, sempre ligado, lendo só as sessões do Claude Code daquela máquina.</p></div>
+      <div class="card comp"><div class="ic"><span data-ic="link"></span></div><b data-en="Pair with a 6-digit code">Pareamento com código de 6 dígitos</b><p data-en="Machines find each other on the local network; pair them with a code and they share the group token — no copying secrets by hand.">As máquinas se encontram na rede local; pareie com um código e elas passam a compartilhar o token do grupo — sem copiar segredos à mão.</p></div>
+      <div class="card comp"><div class="ic"><span data-ic="overview"></span></div><b data-en="The screen can live anywhere">A tela pode ficar em qualquer uma</b><p data-en="Plug the USB screen into any paired machine (or open /tela anywhere): it shows everyone, and the settings follow it.">Plugue a telinha USB em qualquer máquina pareada (ou abra a /tela em qualquer lugar): ela mostra todo mundo, e os ajustes vão junto.</p></div>
+      <div class="card comp"><div class="ic"><span data-ic="history"></span></div><b data-en="Offline machines stay visible">Máquina desligada continua visível</b><p data-en="If a computer goes away it shows as offline with “seen 2 h ago”, and the history adds up every machine.">Se um computador sai do ar, ele aparece como offline com “visto há 2 h”, e o histórico soma todas as máquinas.</p></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><h3 data-en="How it works">Como funciona</h3></div>
+    <div class="card card-b">
+      <svg class="dg" viewBox="0 0 940 300" role="img" aria-label="diagrama">
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker></defs>
+        <rect class="bx" x="10" y="16" width="250" height="72" rx="12"/>
+        <text class="t1" x="135" y="46" text-anchor="middle" data-en="Laptop">Notebook</text>
+        <text class="t2" x="135" y="66" text-anchor="middle" data-en="Claude Code → collector">Claude Code → coletor</text>
+        <rect class="bx" x="10" y="114" width="250" height="72" rx="12"/>
+        <text class="t1" x="135" y="144" text-anchor="middle">Desktop</text>
+        <text class="t2" x="135" y="164" text-anchor="middle" data-en="Claude Code → collector">Claude Code → coletor</text>
+        <rect class="bx" x="10" y="212" width="250" height="72" rx="12"/>
+        <text class="t1" x="135" y="242" text-anchor="middle" data-en="Server">Servidor</text>
+        <text class="t2" x="135" y="262" text-anchor="middle" data-en="Claude Code → collector">Claude Code → coletor</text>
+        <text class="t2" x="352" y="38" text-anchor="middle" data-en="local network">rede local</text>
+        <text class="t2" x="352" y="54" text-anchor="middle" data-en="group token">token do grupo</text>
+        <rect class="bx a" x="440" y="110" width="200" height="80" rx="12"/>
+        <text class="t1" x="540" y="144" text-anchor="middle" data-en="panel + display">painel + tela</text>
+        <text class="t2" x="540" y="164" text-anchor="middle" data-en="on any paired machine">em qualquer máquina pareada</text>
+        <rect class="bx" x="740" y="34" width="190" height="54" rx="12"/>
+        <text class="t1" x="835" y="58" text-anchor="middle" data-en="USB screen">Tela USB</text>
+        <text class="t2" x="835" y="75" text-anchor="middle">plug &amp; play · udev</text>
+        <rect class="bx" x="740" y="123" width="190" height="54" rx="12"/>
+        <text class="t1" x="835" y="147" text-anchor="middle" data-en="Browser">Navegador</text>
+        <text class="t2" x="835" y="164" text-anchor="middle" data-en="/tela · TV, tablet, monitor">/tela · TV, tablet, monitor</text>
+        <rect class="bx" x="740" y="212" width="190" height="54" rx="12"/>
+        <text class="t1" x="835" y="236" text-anchor="middle">Terminal</text>
+        <text class="t2" x="835" y="253" text-anchor="middle">framebuffer</text>
+        <path class="ln d" d="M260 52C360 52 360 140 436 140" marker-end="url(#ah)"/>
+        <path class="ln d" d="M260 150H436" marker-end="url(#ah)"/>
+        <path class="ln d" d="M260 248C360 248 360 160 436 160" marker-end="url(#ah)"/>
+        <path class="ln" d="M640 150C690 150 690 61 736 61" marker-end="url(#ah)"/>
+        <path class="ln" d="M640 150H736" marker-end="url(#ah)"/>
+        <path class="ln" d="M640 150C690 150 690 239 736 239" marker-end="url(#ah)"/>
+      </svg>
+    </div>
+    <div class="comps">
+      <div class="card comp"><div class="ic"><span data-ic="hook"></span></div><b>hook · statusline</b><p data-en="Called by Claude Code; write events and account usage to local files.">Chamados pelo Claude Code; gravam eventos e o uso da conta em arquivos locais.</p></div>
+      <div class="card comp"><div class="ic"><span data-ic="machines"></span></div><b>collector</b><p data-en="One per computer, always on; puts that machine's sessions together and answers the other machines on port 8787 (group token).">Um por computador, sempre ligado; junta as sessões daquela máquina e responde às outras na porta 8787 (token do grupo).</p></div>
+      <div class="card comp"><div class="ic"><span data-ic="overview"></span></div><b>display</b><p data-en="Starts by itself when the USB screen is plugged in (udev) and draws ~5 frames per second.">Sobe sozinho quando a tela USB é plugada (udev) e desenha ~5 quadros por segundo.</p></div>
+      <div class="card comp"><div class="ic"><span data-ic="sliders"></span></div><b>panel</b><p data-en="This panel, on port 8788; it also serves the screen in the browser.">Este painel, na porta 8788; também serve a tela no navegador.</p></div>
+    </div>
+  </div>
+
+  <div class="two">
+    <div class="card"><div class="card-h"><span data-ic="lock"></span><h3 data-en="Privacy">Privacidade</h3></div><div class="card-b prose">
+      <p data-en="The hooks record metadata only (event, tool, agent type). &lt;b&gt;Never&lt;/b&gt; prompts, commands, file contents or answers.">Os hooks gravam só metadados (evento, ferramenta, tipo de agente). <b>Nunca</b> prompts, comandos, conteúdo de arquivos ou respostas.</p>
+      <p data-en="Data stays in &lt;code&gt;~/.local/state/byorzin-monitor/&lt;/code&gt; and only travels on your local network, protected by the group token.">Os dados ficam em <code>~/.local/state/byorzin-monitor/</code> e só trafegam na sua rede local, protegidos pelo token do grupo.</p>
+      <p data-en="On this computer the panel opens directly; from another device, only with the panel link with key (Machines → Access from another device).">Neste computador o painel abre direto; de outro aparelho, só com o link com a chave do painel (Máquinas → Acesso de outro aparelho).</p>
+    </div></div>
+    <div class="card"><div class="card-h"><span data-ic="link"></span><h3 data-en="Links">Links</h3></div><div class="card-b links">
+      <a href="tela" target="_blank" rel="noopener"><span data-ic="overview"></span><span data-en="Screen in the browser">Tela no navegador</span><code>/tela</code></a>
+      <a href="#maquinas"><span data-ic="machines"></span><span data-en="Pair machines and access link">Parear máquinas e link de acesso</span><span data-ic="chev" class="sm"></span></a>
+      <a href="#historico"><span data-ic="history"></span><span data-en="Usage history">Histórico de uso</span><span data-ic="chev" class="sm"></span></a>
+      <a href="#alertas"><span data-ic="bell"></span><span data-en="Alerts and ntfy">Alertas e ntfy</span><span data-ic="chev" class="sm"></span></a>
+    </div></div>
+  </div>
+  <p class="fine" data-en="Source code under the MIT license. The Byorzin mascot (character, name and artwork) is © BYOR-SEC and may be used as part of Byorzin Monitor (see LICENSE-ASSETS.md). Independent project, not affiliated with Anthropic; “Claude” is a trademark of Anthropic.">Código sob licença MIT. O mascote Byorzin (personagem, nome e arte) é © BYOR-SEC e pode ser usado como parte do Byorzin Monitor (veja LICENSE-ASSETS.md). Projeto independente, não afiliado à Anthropic; “Claude” é marca da Anthropic.</p>
+</section>
+</main>
+</div>
+
+<div class="scrim" id="scrim" data-act="close"></div>
+<aside id="drawer" role="dialog" aria-modal="true" aria-labelledby="dTitle" aria-hidden="true">
+  <div class="dh"><div id="dHead"></div><button class="iconbtn" data-act="close" aria-label="Fechar / Close"><span data-ic="x"></span></button></div>
+  <div class="db" id="mbody"></div>
+</aside>
+<div id="toast" role="status" aria-live="polite"><span class="ic" id="toastIc"></span><span id="toastT"></span></div>
+<div class="ttip" id="ttip"></div>
+
+<script>
+const $=id=>document.getElementById(id),$$=s=>[...document.querySelectorAll(s)];
+let ST=null,data='demo',tab='tela',editing=0,saveSt={s:'idle',at:0,n:0};
+/* ícones de linha (24x24, traço = currentColor) */
+const IC={
+ overview:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+ layouts:'<rect x="3.5" y="3.5" width="7" height="9" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="5" rx="1.5"/><rect x="13.5" y="11.5" width="7" height="9" rx="1.5"/><rect x="3.5" y="15.5" width="7" height="5" rx="1.5"/>',
+ scenes:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/><path d="M16 3.5v3M14.5 5h3"/>',
+ history:'<path d="M3.5 20.5h17"/><path d="M6.5 16.5v-4M11 16.5v-9M15.5 16.5v-6M20 16.5V5"/>',
+ sliders:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+ bell:'<path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 8 2.5 8h-17S6 15 6 9z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
+ machines:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01M11 7.5h3M11 16.5h3"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8v.01"/>',
+ external:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/>',
+ cpu:'<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9.5 9.5h5v5h-5zM9 2.5V6M15 2.5V6M9 18v3.5M15 18v3.5M2.5 9H6M2.5 15H6M18 9h3.5M18 15h3.5"/>',
+ menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+ sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>',
+ moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+ activity:'<path d="M3 12h4l2.5-7 5 14 2.5-7h4"/>',
+ hand:'<path d="M12 8v10M12 8a2 2 0 1 0-4 0v8.5M12 8V5.5a2 2 0 1 1 4 0V12M16 9.5a2 2 0 1 1 4 0v4a7.5 7.5 0 0 1-12 6"/>',
+ agents:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.8a3.2 3.2 0 0 1 0 6.4M18 14.5a6 6 0 0 1 3 5.5"/>',
+ coins:'<ellipse cx="9" cy="7" rx="6" ry="3"/><path d="M3 7v5c0 1.7 2.7 3 6 3s6-1.3 6-3V7"/><path d="M15 11.2c3.2.2 6 1.4 6 2.8 0 1.7-2.7 3-6 3-1.6 0-3-.3-4.1-.8M3 12v5c0 1.7 2.7 3 6 3 1.7 0 3.2-.3 4.3-.9M21 14v4c0 1.7-2.7 3-6 3"/>',
+ calendar:'<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+ chev:'<path d="m9 6 6 6-6 6"/>',
+ play:'<path d="M7 5v14l11-7z"/>',
+ check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+ x:'<path d="M6 6l12 12M18 6 6 18"/>',
+ copy:'<rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/>',
+ key:'<circle cx="8" cy="15" r="4.5"/><path d="m11.2 11.8 8.3-8.3M16.5 6.5l2.5 2.5M14 9l2 2"/>',
+ link:'<path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/>',
+ lock:'<rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
+ reset:'<path d="M4 4v5h5"/><path d="M5.1 15a7.5 7.5 0 1 0 1.7-7.8L4 9"/>',
+ alert:'<path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.3v.01"/>',
+ hook:'<path d="M7 3v8a5 5 0 0 0 10 0V8"/><path d="m14 10 3-3 3 3"/>',
+ loader:'<path d="M12 3a9 9 0 1 0 9 9"/>',
+ rotate:'<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3.5V8h4.5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20.5V16h-4.5"/>',
+ pin:'<path d="M12 17v4.5"/><path d="M8 3.5h8l-1 6 3 3.5H6l3-3.5z"/>',
+ wifi:'<path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.7 16a5 5 0 0 1 6.6 0M12 19.5v.01"/>',
+ user:'<circle cx="12" cy="8" r="3.8"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>',
+ party:'<path d="M4 20 8.5 7.5l8 8z"/><path d="M14 4.5l.8 1.6M19.5 10l-1.6-.8M17 3.5l-1 3M20.5 7l-3 1"/>',
+};
+/* imagens da tela em alta resolução (?scale=; servidor sem suporte ignora e manda 480x320) */
+const SC=Math.min(3,Math.max(2,Math.ceil((window.devicePixelRatio||1)*1.5)));
+const ico=(n,c)=>`<svg class="i${c?' '+c:''}" viewBox="0 0 24 24" aria-hidden="true">${IC[n]||''}</svg>`;
+for(const e of $$('[data-ic]'))e.outerHTML=ico(e.dataset.ic,e.className);
+
+/* idioma do painel: escolhido no cabeçalho, lembrado no navegador; padrão = idioma do navegador */
+const QLANG=new URLSearchParams(location.search).get('lang');
+if(QLANG=='en'||QLANG=='pt-BR')localStorage.setItem('byorzin.lang',QLANG);
+let LANG=localStorage.getItem('byorzin.lang')||((navigator.language||'').toLowerCase().startsWith('pt')?'pt-BR':'en');
+const L=(pt,en)=>LANG=='en'?en:pt;
+const STATUS={working:['trabalhando','working'],waiting:['esperando você','waiting for you'],idle:['ocioso','idle'],error:['erro','error'],limit:['limite','limit']};
+const stName=s=>STATUS[s]?L(...STATUS[s]):s;
+const SECT={tela:['Visão geral','Overview'],layouts:['Layouts','Layouts'],cenas:['Cenas','Scenes'],historico:['Histórico','History'],
+  ajustes:['Comportamento','Behavior'],alertas:['Alertas','Alerts'],maquinas:['Máquinas','Machines'],sobre:['Sobre','About']};
+/* tudo que vem do servidor ou da rede passa por esc(); nada de JS inline com dados (cliques por data-act) */
+const esc=s=>String(s??'').replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c]));
+const safeUrl=u=>/^https?:\/\/[^\s"'<>`]+$/i.test(String(u||''))?String(u):'';
+const safeColor=c=>/^#[0-9a-fA-F]{6}$/.test(String(c||''))?String(c):'#5ac8ff';
+const num=v=>Number.isFinite(+v)?+v:0;
+const lname=l=>LANG=='en'?l.name_en||l.name:l.name, ldesc=l=>LANG=='en'?l.desc_en||l.desc:l.desc;
+const nfmt=v=>num(v).toLocaleString(LANG);
+function applyLang(){document.documentElement.lang=LANG;
+  for(const b of $$('.langseg button'))b.classList.toggle('on',b.dataset.l==LANG);
+  for(const e of $$('[data-en]')){if(e._pt==null)e._pt=e.innerHTML;e.innerHTML=LANG=='en'?e.dataset.en:e._pt}
+  for(const e of $$('[data-en-ph]')){if(e._ph==null)e._ph=e.placeholder;e.placeholder=LANG=='en'?e.dataset.enPh:e._ph}
+  $('now').alt=L('tela agora','screen now');$('secTitle').textContent=L(...SECT[tab]);$('side').setAttribute('aria-label',L('Navegação','Navigation'));
+  saveState()}
+function setLang(l){LANG=l;localStorage.setItem('byorzin.lang',LANG);applyLang();
+  if(ST){header();telaTab();renderLayouts();renderForm();renderScenes();renderMachines();renderAlerts();if(histAt)loadHistory()}
+  telaOpts();refresh()}
+for(const b of $$('.langseg button'))b.onclick=()=>setLang(b.dataset.l);
+
+/* tema claro/escuro (lembrado no navegador) */
+function themeIcon(){const t=document.documentElement.dataset.theme;$('themeIc').outerHTML=`<span id="themeIc">${ico(t=='light'?'moon':'sun')}</span>`;
+  $('themeBtn').title=t=='light'?L('Tema escuro','Dark theme'):L('Tema claro','Light theme')}
+$('themeBtn').onclick=()=>{const t=document.documentElement.dataset.theme=='light'?'dark':'light';document.documentElement.dataset.theme=t;
+  localStorage.setItem('byorzin.theme',t);themeIcon();if(lastHist)tokChart(lastHist)};
+themeIcon();applyLang();
+
+const HDR={'Content-Type':'application/json','X-Byorzin':'1'};
+async function api(p,b){const r=await fetch(p,b?{method:'POST',headers:HDR,body:JSON.stringify(b)}:{});
+  if(r.status==401){location.reload();throw new Error('401')}
+  const j=await r.json();if(!r.ok)throw new Error(j.erro||('erro '+r.status));return j}
+function toast(t,bad){const e=$('toast');$('toastT').textContent=t;$('toastIc').innerHTML=ico(bad?'alert':'check','sm');e.classList.toggle('bad',!!bad);
+  e.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('show'),2600)}
+/* indicador de salvamento automático (Comportamento e Alertas) */
+function saveState(s,extra){if(s){saveSt={s,at:Date.now(),n:extra||0}}
+  const {s:st,at,n}=saveSt,t=at?new Date(at).toLocaleTimeString(LANG,{hour:'2-digit',minute:'2-digit'}):'';
+  const html=st=='busy'?ico('loader','sm')+L('Salvando…','Saving…'):st=='ok'?ico('check','sm')+L('Salvo','Saved')+' '+t+(n?L(` · replicado em ${n}`,` · replicated to ${n}`):''):
+    st=='bad'?ico('alert','sm')+L('Não salvou','Not saved'):ico('check','sm')+L('Salvamento automático','Auto-save');
+  for(const e of $$('[data-save]')){e.innerHTML=html;e.className='savest'+(st=='idle'?'':' '+st)}}
+saveState();
+async function save(patch,msg){let r;saveState('busy');try{r=await api('api/settings',patch)}catch(e){saveState('bad');toast(e.message,true);return}ST.settings=r.settings;
+  const n=(r.synced_to||[]).length;saveState('ok',n);
+  toast((msg||L('Salvo','Saved'))+(n?L(' · replicado',' · replicated'):''));renderLayouts();}
+
+/* navegação */
+function showTab(t){tab=t;for(const b of $$('#tabs button'))b.classList.toggle('on',b.dataset.t==t);
+  for(const b of $$('#tabs button'))b.toggleAttribute('aria-current',b.dataset.t==t);
+  for(const s of $$('.tab'))s.classList.toggle('on',s.id=='t-'+t);history.replaceState(null,'','#'+t);
+  $('secTitle').textContent=L(...SECT[t]);document.title=L(...SECT[t])+' · Byorzin Monitor';
+  document.body.classList.remove('nav-open');$('navScrim').classList.remove('on');scrollTo(0,0);refresh()}
+for(const b of $$('#tabs button'))b.onclick=()=>showTab(b.dataset.t);
+onhashchange=()=>{const h=location.hash.slice(1);if(h!=tab&&$('t-'+h))showTab(h)};
+for(const b of $$('#dataSeg button'))b.onclick=()=>{data=b.dataset.d;
+  for(const x of $$('#dataSeg button'))x.classList.toggle('on',x==b);refresh(true)};
+
+/* topo + visão geral */
+function seenAgo(ts){return L('visto há '+ago(ts),'seen '+ago(ts)+' ago')}
+function hostColor(h){return safeColor((ST.settings.colors||{})[h]||ST.default_colors[h])}
+/* no tema claro as cores neon das máquinas escurecem nos gráficos (contraste) */
+function inkColor(c){if(document.documentElement.dataset.theme!='light')return c;const n=parseInt(c.slice(1),16),f=.72;
+  return '#'+[n>>16,n>>8&255,n&255].map(v=>Math.round(v*f).toString(16).padStart(2,'0')).join('')}
+function header(){
+  $('pMach').textContent=ST.machine;$('pVer').textContent=L('este painel','this panel')+(ST.version?' · v'+ST.version:'');
+  $('aboutVer').textContent=ST.version?L('versão ','version ')+ST.version:'';
+  {const ms=ST.machines||[],on=ms.filter(m=>m.up).length;
+   $('aboutMach').textContent=ms.length?L(`${ms.length} ${ms.length>1?'máquinas':'máquina'} · ${on} online`,`${ms.length} ${ms.length>1?'machines':'machine'} · ${on} online`):'';}
+  screenPill();
+  const ms=ST.machines,show=ms.slice(0,4);
+  $('pHosts').innerHTML=show.map(m=>`<span class="chip ${m.up?'':'off'}" title="${esc(m.up?'online':'offline'+(m.seen?' · '+seenAgo(m.seen):''))}"><span class="dot" style="background:${m.up?hostColor(m.name):'var(--idle)'};${m.up?'':'opacity:.5'}"></span>${esc(m.name)}</span>`).join('')+
+    (ms.length>show.length?`<span class="chip">+${ms.length-show.length}</span>`:'');
+  const w=ST.summary.waiting;$('navWait').hidden=!w;$('navWait').textContent=w;
+}
+/* onde está a tela física: 'here' | nome da máquina | '' (nenhuma) | null (ainda não sei) */
+let SCREEN=null;
+function screenPill(){const e=$('pScreen'),here=ST&&ST.screen_here||SCREEN==='here';
+  const t=here?L('tela conectada aqui','screen plugged in here'):SCREEN?L('tela em ','screen on ')+SCREEN:SCREEN===''?L('sem tela física','no physical screen'):'';
+  e.innerHTML=t?`<span class="dot ${here||SCREEN?'live':''}"></span><span>${esc(t)}</span>`:'';e.className='chip scr'+(here||SCREEN?' ok':' off')}
+const pc=v=>v==null?'–':Math.round(v)+'<small>%</small>';
+/* rótulo da conta, só quando há 2+ contas (com uma, o painel fica como sempre) */
+function acctName(id){const as=(ST&&ST.accounts)||[];if(as.length<2||!id)return '';const a=as.find(a=>a.id==id);return a?a.label:''}
+const lvl=v=>v<60?'var(--accent)':v<85?'var(--waiting)':'var(--error)';
+function telaTab(){
+  const s=ST.summary;
+  $('kAct').innerHTML=`${num(s.active)}<small>/ ${num(s.sessions)}</small>`;$('kActB').style.width=(s.sessions?100*s.active/s.sessions:0)+'%';
+  $('kWait').textContent=s.waiting;$('kWaitBox').classList.toggle('warn',!!s.waiting);
+  $('kWaitS').textContent=s.waiting?L('permissão ou resposta pendente','permission or answer pending'):L('ninguém esperando','nobody waiting');
+  $('kAg').textContent=s.agents;$('kTok').textContent=s.tok_today;$('kTokS').textContent=s.tok_week?L('semana: ','week: ')+s.tok_week:'';
+  $('kWeek').innerHTML=pc(s.week);$('kWeekB').style.width=(s.week||0)+'%';$('kWeekB').style.background=lvl(s.week||0);
+  $('kFive').innerHTML=pc(s.five);$('kFiveB').style.width=(s.five||0)+'%';$('kFiveB').style.background=lvl(s.five||0);
+  /* várias contas: o número grande é a conta mais apertada; embaixo, uma linha por conta */
+  const accs=s.accounts||[];
+  for(const [id,k] of [['kWeek','week'],['kFive','five']]){const box=$(id+'A');box.hidden=accs.length<2;$(id+'B').parentNode.hidden=accs.length>=2;
+    box.innerHTML=accs.length<2?'':accs.map(a=>`<div class="ar"><span title="${esc(a.label)}">${esc(a.label)}</span><div class="meter"><i style="width:${Math.min(100,num(a[k]))}%;background:${lvl(num(a[k]))}"></i></div><em>${a[k]==null?'–':Math.round(num(a[k]))+'%'}</em></div>`).join('')}
+  $('hiddenNote').hidden=!s.hidden;$('hiddenNote').textContent=s.hidden?L(`+${s.hidden} ociosas ocultas`,`+${s.hidden} idle hidden`):'';
+  $('sessCount').textContent=s.list.length?`${s.list.length}`:'';
+  $('sessList').innerHTML=s.list.length?s.list.map(x=>`<button class="srow ${esc(x.status)}" data-act="session" data-host="${esc(x.host)}" data-id="${esc(x.id)}">
+    <div class="t"><b>${x.kind=='llm'?`<span class="pill llm nodot">${L('LLM local','local LLM')}</span>`:''}<span class="n">${esc(x.label)}</span></b>
+    <small><span class="dot" style="background:${hostColor(x.host)}"></span>${esc(x.host)}${acctName(x.account)?' · '+esc(acctName(x.account)):''}${x.sub?' · '+esc(x.sub):''}${x.tool?' · '+esc(x.tool):''}</small></div>
+    <div class="st"><span class="pill ${esc(x.status)}">${esc(stName(x.status))}</span></div>
+    <div class="ctx">${x.ctx!=null?`<span class="num">${Math.round(num(x.ctx))}%</span><div class="meter"><i style="width:${num(x.ctx)}%;background:${lvl(num(x.ctx))}"></i></div>`:'<span>–</span>'}</div>
+    <div class="ag ${x.agents?'':'z'}">${ico('agents','xs')}<span class="num">${num(x.agents)}</span></div>${ico('chev','sm')}</button>`).join('')
+    :`<div class="empty"><img src="img/icon.png" alt=""><b>${L('Nenhuma sessão aberta','No open sessions')}</b>${L('O Byorzin está descansando. Abra o Claude Code em qualquer máquina pareada e ela aparece aqui.','The Byorzin is resting. Open Claude Code on any paired machine and it shows up here.')}</div>`;
+  if(!editing){
+    $('qLayout').innerHTML=ST.layouts.map(l=>`<option value="${esc(l.id)}" ${l.id==ST.settings.layout?'selected':''}>${esc(lname(l))}</option>`).join('');
+    $('qBright').value=ST.settings.brightness_day;rangeFill($('qBright'));$('qBrightV').textContent=ST.settings.brightness_day+'%';
+  }
+}
+function rangeFill(e){const p=(e.value-e.min)/(e.max-e.min)*100;e.style.setProperty('--p',p+'%')}
+$('qLayout').onchange=e=>save({layout:e.target.value,rotate_layouts:[]},'Layout: '+e.target.selectedOptions[0].text);
+$('qBright').oninput=e=>{$('qBrightV').textContent=e.target.value+'%';rangeFill(e.target)};
+$('qBright').onchange=e=>save({brightness_day:+e.target.value},L('Brilho ','Brightness ')+e.target.value+'%');
+for(const id of ['qLayout','qBright']){$(id).onfocus=()=>editing++;$(id).onblur=()=>editing=Math.max(0,editing-1)}
+
+/* layouts */
+function renderLayouts(){
+  const s=ST.settings,rot=s.rotate_layouts||[],rotating=rot.length>1;
+  if(document.activeElement!=$('qRot'))$('qRot').value=s.rotate_seconds;
+  const cur=ST.layouts.find(l=>l.id==s.layout);
+  $('layState').innerHTML=rotating?`${ico('rotate','sm')}<span>${L(`Alternando <b>${rot.length}</b> layouts a cada <b>${num(s.rotate_seconds)} s</b>`,`Rotating <b>${rot.length}</b> layouts every <b>${num(s.rotate_seconds)} s</b>`)}</span>`
+    :`${ico('pin','sm')}<span>${L('Layout fixo: ','Pinned layout: ')}<b>${esc(cur?lname(cur):s.layout)}</b>${rot.length==1?L(' · ligue alternar em mais um para a rotação começar',' · turn rotate on for one more to start rotating'):''}</span>`;
+  $('lgrid').innerHTML=ST.layouts.map((l,i)=>{const sel=!rotating&&s.layout==l.id,inrot=rotating&&rot.includes(l.id);
+    const id=esc(l.id);
+    return `<div class="card gi ${sel?'sel':''} ${inrot?'rot':''}"><div class="shot"><img data-src="img/layout/${id}.png" src="img/layout/${id}.png?data=${esc(data)}&scale=${SC}" alt="">
+</div>
+    <div class="gb"><h4><span class="idx">${i+1}</span>${esc(lname(l))}<span class="sp"></span>${sel?`<span class="pill ok">${L('em uso','in use')}</span>`:''}${inrot?`<span class="pill rot">${L('na rotação','rotating')}</span>`:''}</h4><p>${esc(ldesc(l))}</p></div>
+    <div class="ga">${sel?`<button class="btn sm cur" aria-disabled="true" tabindex="-1">${ico('check','sm')}${L('Em uso','In use')}</button>`:`<button class="btn sm pri" data-act="use" data-id="${id}">${L('Usar','Use')}</button>`}
+    <label class="mini-sw"><span class="sw"><input type="checkbox" ${rot.includes(l.id)?'checked':''} data-chg="rot" data-id="${id}"><span></span></span>${L('Alternar','Rotate')}</label>
+    <span class="sp"></span><button class="btn sm ghost" data-act="force" data-mode="layout:${id}" title="${L('Mostra na tela real por 15 s','Shows on the real screen for 15 s')}">${ico('play','xs')}${L('Testar','Test')}</button></div></div>`}).join('');
+}
+function useLayout(id){save({layout:id,rotate_layouts:[]},'Layout: '+lname(ST.layouts.find(l=>l.id==id)))}
+function toggleRot(id,on){const r=new Set(ST.settings.rotate_layouts||[]);on?r.add(id):r.delete(id);
+  save({rotate_layouts:[...r]},r.size>1?L(`Alternando ${r.size} layouts`,`Rotating ${r.size} layouts`):L('Rotação desligada','Rotation off'))}
+$('qRot').onchange=e=>save({rotate_seconds:+e.target.value},L('Troca a cada ','Switches every ')+e.target.value+' s');
+async function force(m){try{await api('api/force',{mode:m,seconds:15});toast(L('Na tela por 15 s','On screen for 15 s'))}catch(e){toast(e.message,true)}}
+
+/* comportamento e alertas: o formulário vem do servidor; aqui só a organização */
+const UNITS={brightness_day:'%',brightness_night:'%',night_start:'h',night_end:'h',awake_minutes:'min',sleep_minutes:'min',
+ dream_every_minutes:'min',host_panel_every_seconds:'s',limit_alert_pct:'%',hide_idle_hours:'h',rotate_seconds:'s',fps:'fps',
+ alert_screen_seconds:'s',alert_cooldown_seconds:'s',done_minutes:'min',llm_gpu_pct:'%',llm_linger_seconds:'s'};
+const RANGES=new Set(['brightness_day','brightness_night','limit_alert_pct','llm_gpu_pct']);
+const CHOICE_EN={'título':'title','projeto':'project','semana':'week','fixo':'fixed','pt-BR':'Português','en':'English'};
+const CHOICE_PT={'pt-BR':'Português','en':'English','5h':'5h'};
+function choiceLabel(c){return LANG=='en'?CHOICE_EN[c]||c:CHOICE_PT[c]||c}
+const GROUP_INFO={
+ 'Tela':['Idioma','Language','Idioma dos textos desenhados na tela física e na página /tela.','Language of the text drawn on the physical screen and on the /tela page.'],
+ 'Brilho e noite':[0,0,'Brilho de dia e de noite e o horário noturno, quando a tela pode até desligar.','Day and night brightness and the night hours, when the screen can even turn off.'],
+ 'Byorzin ocioso':[0,0,'O que o mascote faz quando ninguém está usando: cochila, dorme, sonha e mostra a máquina.','What the mascot does when nobody is using it: naps, sleeps, dreams and shows the machine.'],
+ 'Sessões e alertas':['Sessões','Sessions','Como as sessões aparecem na tela e o que faz o Byorzin engordar.','How sessions show up on the screen and what makes the Byorzin fatter.'],
+ 'Animação':[0,0,'Fluidez da animação na tela USB.','Smoothness of the animation on the USB screen.'],
+ 'LLM local':[0,0,'Mostra um modelo do Ollama gerando como se fosse uma sessão.','Shows an Ollama model generating as if it were a session.'],
+};
+const ALERT_GROUPS=[
+ ['Na tela','On the screen','Moldura piscando e brilho máximo quando uma sessão precisa de você.','Flashing frame and full brightness when a session needs you.',['alert_screen','alert_screen_seconds','alert_max_brightness','alert_idle','alert_cooldown_seconds']],
+ ['Trabalhos longos','Long jobs','Comemoração e aviso quando um turno demorado termina.','Celebration and notice when a long turn finishes.',['done_minutes','done_celebrate']],
+ ['Limite de uso','Usage limit','Quando avisar que a semana ou a janela de 5h está acabando.','When to warn that the week or the 5h window is running out.',['limit_alert_pct']],
+ ['Neste navegador','In this browser','Notificação do sistema e um som curto enquanto o painel estiver aberto.','System notification and a short sound while the panel is open.',['alert_browser','alert_sound'],'browser'],
+ ['No celular (ntfy)','On your phone (ntfy)','Push pelo ntfy, enviado pelo coletor da máquina onde a sessão roda.','Push via ntfy, sent by the collector of the machine running the session.',['ntfy_enabled','ntfy_server','ntfy_topic','ntfy_waiting','ntfy_done']],
+];
+const ALERT_KEYS=new Set(ALERT_GROUPS.flatMap(g=>g[4]));
+function control(k){const sc=ST.schema[k],v=ST.settings[k];
+  k=esc(k);
+  if(sc.type=='bool')return `<label class="sw"><input type="checkbox" data-k="${k}" ${v?'checked':''}><span></span></label>`;
+  if(sc.type=='choice'&&sc.choices.length<=3)return `<span class="seg" role="radiogroup">${sc.choices.map(c=>`<button role="radio" aria-checked="${c==v}" class="${c==v?'on':''}" data-act="segk" data-k="${k}" data-v="${esc(c)}">${esc(choiceLabel(c))}</button>`).join('')}</span>`;
+  if(sc.type=='choice')return `<select data-k="${k}">${sc.choices.map(c=>`<option value="${esc(c)}" ${c==v?'selected':''}>${esc(choiceLabel(c))}</option>`).join('')}</select>`;
+  if(RANGES.has(k))return `<div class="rng"><input type="range" data-k="${k}" min="${num(sc.min)}" max="${num(sc.max)}" step="5" value="${num(v)}"><span class="val num" data-v="${k}">${num(v)}%</span></div>`;
+  if(sc.type=='str'){const secret=ST.settings[k+'_set']&&!v;
+    return `<input type="text" data-k="${k}" maxlength="${num(sc.max)||200}" value="${esc(v)}"${secret?` placeholder="${esc(L('(definido; oculto)','(set; hidden)'))}"`:''} spellcheck="false" autocomplete="off">`}
+  return `<span class="ig"><input type="number" data-k="${k}" min="${num(sc.min)}" max="${num(sc.max)}" value="${num(v)}"><span>${esc(UNITS[k]||'#')}</span></span>`}
+const frow=(k,l,h)=>`<div class="row"><div class="l"><b>${esc(l)}</b>${h?`<small>${esc(h)}</small>`:''}</div><div class="c">${control(k)}</div></div>`;
+const fgroup=(t,d,rows,extra)=>`<div class="fg"><div class="gh"><h3>${esc(t)}</h3>${d?`<p>${esc(d)}</p>`:''}</div><div class="card">${rows}${extra||''}</div></div>`;
+function renderForm(){
+  const en=LANG=='en'&&ST.form_en,lab={};
+  ST.form.forEach((g,i)=>g[1].forEach((f,j)=>{const e=en?ST.form_en[i][1][j]:f;lab[f[0]]=[e[1],e[2]]}));
+  $('form').innerHTML=ST.form.map((g,i)=>{const fs=g[1].filter(f=>!ALERT_KEYS.has(f[0])&&ST.schema[f[0]]);if(!fs.length)return '';
+    const info=GROUP_INFO[g[0]]||[],t=info[0]?L(info[0],info[1]):(en?ST.form_en[i][0]:g[0]);
+    return fgroup(t,info[2]?L(info[2],info[3]):'',fs.map(f=>frow(f[0],...lab[f[0]])).join(''))}).join('');
+  $('alertForm').innerHTML=ALERT_GROUPS.map(([pt,e,dp,de,keys,x])=>{const ks=keys.filter(k=>ST.schema[k]&&lab[k]);if(!ks.length)return '';
+    const extra=x=='browser'?`<div class="extra"><button class="btn sm" data-act="notif">${ico('bell','xs')}${L('Permitir notificações aqui','Allow notifications here')}</button><button class="btn sm ghost" data-act="beep">${ico('play','xs')}${L('Testar som','Test sound')}</button></div>`:'';
+    return fgroup(L(pt,e),L(dp,de),ks.map(k=>frow(k,...lab[k])).join(''),extra)}).join('');
+  for(const root of [$('form'),$('alertForm')])for(const e of root.querySelectorAll('input[data-k],select[data-k]')){
+    e.onfocus=()=>editing++;e.onblur=()=>editing=Math.max(0,editing-1);
+    if(e.type=='range')rangeFill(e);
+    e.oninput=()=>{if(e.type!='range')return;rangeFill(e);const u=root.querySelector(`[data-v="${e.dataset.k}"]`);if(u)u.textContent=e.value+'%'};
+    e.onchange=()=>{const k=e.dataset.k,sc=ST.schema[k];save({[k]:sc.type=='bool'?e.checked:(sc.type=='choice'||sc.type=='str')?e.value:+e.value})}}
+}
+function segSet(btn){const k=btn.dataset.k;for(const b of btn.parentNode.children){b.classList.toggle('on',b==btn);b.setAttribute('aria-checked',b==btn)}save({[k]:btn.dataset.v})}
+$('btnReset').onclick=async()=>{if(!confirm(L('Restaurar todos os ajustes para o padrão?','Restore all settings to their defaults?')))return;
+  const p={};for(const [k,sc] of Object.entries(ST.schema))if(!['force','colors','hosts_hidden','language'].includes(k))p[k]=sc.default;
+  await save(p,L('Padrões restaurados','Defaults restored'));renderForm()};
+function renderAlerts(){const al=(ST.alerts||[]).slice(-8).reverse();
+  $('alertList').innerHTML=al.length?al.map(a=>{const [t,b]=alertText(a);return `<div class="al"><span class="ic ${a.type=='done'?'done':''}">${ico(a.type=='done'?'party':'hand','sm')}</span>
+    <div><b>${esc(t)}</b><small>${esc(b)}</small></div><time>${a.ts?esc(L('há '+ago(a.ts),ago(a.ts)+' ago')):''}</time></div>`}).join('')
+    :`<div class="empty"><img src="img/icon.png" alt=""><b>${L('Nenhum alerta recente','No recent alerts')}</b>${L('Quando uma sessão esperar você ou um trabalho longo terminar, aparece aqui.','When a session waits for you or a long job finishes, it shows up here.')}</div>`}
+
+/* cenas */
+const SCENE_DESC={awake:['Byorzin acordado logo depois da última atividade.','Byorzin awake right after the last activity.'],
+ sleepy:['Bocejando, alguns minutos sem uso.','Yawning, a few minutes without use.'],sleep:['Dormindo depois de um bom tempo parado.','Sleeping after a long idle time.'],
+ dream:['Sonha com recordes, modelo favorito e dias de uso.','Dreams about records, favorite model and days of use.'],
+ wake:['Leva um susto quando uma sessão nova abre.','Gets startled when a new session opens.'],limit:['Aviso quando a semana ou a janela de 5h chega perto do limite.','Warning when the week or the 5h window nears the limit.'],
+ host:['CPU, GPU, RAM e Docker da máquina, alternando com o Byorzin.','Machine CPU, GPU, RAM and Docker, alternating with the Byorzin.'],
+ alert:['Moldura piscando quando alguém espera você.','Flashing frame when someone is waiting for you.'],done:['Comemoração quando um trabalho longo termina.','Celebration when a long job finishes.']};
+function renderScenes(){const sc=LANG=='en'&&ST.scenes_en?ST.scenes_en:ST.scenes;
+  $('sgrid').innerHTML=Object.entries(sc).map(([k,n])=>`<div class="card gi">
+  <div class="shot"><img data-src="img/scene/${esc(k)}.png" src="img/scene/${esc(k)}.png?data=${esc(data)}&scale=${SC}" alt=""></div>
+  <div class="gb"><h4>${esc(n)}</h4><p>${SCENE_DESC[k]?esc(L(...SCENE_DESC[k])):''}</p></div>
+  <div class="ga"><span class="sp"></span><button class="btn sm" data-act="force" data-mode="${esc(k)}">${ico('play','xs')}${L('Testar na tela','Test on screen')}</button></div></div>`).join('')}
+
+/* máquinas */
+function ago(ts){const s=Math.max(0,Date.now()/1000-ts);return s<60?Math.round(s)+' s':s<3600?Math.round(s/60)+' min':s<86400?Math.round(s/3600)+' h':Math.round(s/86400)+' d'}
+const meterRow=(lab,p,txt)=>`<div class="rl"><span>${esc(lab)}</span><div class="meter"><i style="width:${Math.min(100,Math.max(0,p))}%;background:${lvl(p)}"></i></div><em>${esc(txt)}</em></div>`;
+function renderMachines(){
+  $('pairedCount').textContent=ST.machines.length?L(`${ST.machines.filter(m=>m.up).length} de ${ST.machines.length} online`,`${ST.machines.filter(m=>m.up).length} of ${ST.machines.length} online`):'';
+  $('mgrid').innerHTML=ST.machines.map(m=>{const hidden=(ST.settings.hosts_hidden||[]).includes(m.name),c=hostColor(m.name);
+    const pnl=safeUrl(m.panel),ram=/([\d.]+)\/([\d.]+)/.exec(m.ram||'');
+    const sub=m.up?L('online','online'):m.seen?seenAgo(m.seen):L('sem contato','no contact');
+    return `<div class="card mc ${m.up?'':'down'}"><div class="mh"><div class="av" style="background:color-mix(in srgb,${c} 14%,transparent);color:${m.up?c:'var(--text-3)'}">${ico('machines')}</div>
+    <div><b>${esc(m.name)}</b><small>${esc(m.local?L('esta máquina','this machine'):m.url?m.url.replace(/^https?:\/\//,''):'')}</small></div>
+    <span class="pill ${m.up?'ok':''}">${esc(sub)}</span></div>
+    ${m.sessions!=null?`<div class="stats"><div><b>${num(m.sessions)}</b><small>${L('sessões','sessions')}</small></div><div><b>${num(m.active)}</b><small>${L('ativas','active')}</small></div><div><b>${num(m.agents)}</b><small>${L('agentes','agents')}</small></div></div>
+      ${m.up&&(m.cpu!=null||ram||m.gpu!=null)?`<div class="res">${m.cpu!=null?meterRow('CPU',num(m.cpu),Math.round(num(m.cpu))+'%'):''}${ram?meterRow('RAM',100*ram[1]/ram[2],m.ram):''}${m.gpu!=null?meterRow('GPU',num(m.gpu),Math.round(num(m.gpu))+'%'):''}
+      ${m.ollama&&m.ollama.length?`<div class="rl"><span>Ollama</span><div style="grid-column:span 2;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.ollama.join(', '))}</div></div>`:''}</div>`:''}
+      ${!m.up&&m.seen?`<div class="res"><div class="rl"><span>${L('Contato','Contact')}</span><div style="grid-column:span 2;color:var(--text-2)">${esc(new Date(num(m.seen)*1000).toLocaleString(LANG))} · ${num(m.sessions)} ${num(m.sessions)==1?L('sessão','session'):L('sessões','sessions')}</div></div></div>`:''}`
+    :`<div class="res"><div class="note">${ico('wifi','sm')}<span>${L('O coletor nunca respondeu (máquina desligada, fora da rede ou token diferente).','The collector never answered (machine off, out of the network or a different token).')}</span></div></div>`}
+    <div class="mset">
+    ${m.account&&acctName(m.account.id)?`<div class="row"><div class="l"><b>${L('Conta do Claude','Claude account')}</b></div><div class="c"><span class="acct">${ico('user','xs')}${esc(acctName(m.account.id))}</span></div></div>`:''}
+    <div class="row"><div class="l"><b>${L('Cor do Byorzin','Byorzin color')}</b></div><div class="c"><span class="muted num" style="font:12px var(--mono)">${esc(c)}</span><input type="color" value="${c}" data-chg="color" data-host="${esc(m.name)}" aria-label="${L('Cor','Color')}"></div></div>
+    <div class="row"><div class="l"><b>${L('Mostrar sessões na tela','Show sessions on screen')}</b></div><div class="c"><label class="sw"><input type="checkbox" ${hidden?'':'checked'} data-chg="hidden" data-host="${esc(m.name)}"><span></span></label></div></div>
+    ${pnl?`<div class="row"><div class="l"><b>${L('Painel desta máquina','This machine\'s panel')}</b></div><div class="c"><a class="btn sm ghost" href="${esc(pnl)}" target="_blank" rel="noopener noreferrer">${ico('external','xs')}${L('Abrir','Open')}</a></div></div>`:''}
+    ${m.url?`<div class="row"><div class="l"><b>${L('Desparear','Unpair')}</b><small>${L('deixa de aparecer aqui e nos dois lados','stops showing up here and on both sides')}</small></div><div class="c"><button class="btn sm danger" data-act="unpair" data-url="${esc(m.url)}" data-name="${esc(m.name)}">${L('Remover','Remove')}</button></div></div>`:''}
+    </div></div>`}).join('');
+  renderAccounts();
+  const N=ST.net||{found:[],discovery:{}},d=N.discovery||{};
+  $('discNote').textContent=!d.on?L('descoberta desligada','discovery off'):d.listening?L(`ouvindo a porta ${d.port}/udp`,`listening on port ${d.port}/udp`):L(`porta ${d.port}/udp ocupada`,`port ${d.port}/udp busy`);
+  $('discNote').className='pill '+(d.on&&d.listening?'ok':'');
+  $('fgrid').innerHTML=N.found.length?N.found.map(f=>`<div class="fm"><span class="av">${ico('wifi','sm')}</span>
+    <div><b>${esc(f.host)}</b><small class="num">${esc(f.ip)} · ${L('coletor','collector')} ${num(f.port)} · ${L('painel','panel')} ${num(f.panel_port)}${f.version?' · v'+esc(f.version):''}</small></div>
+    <button class="btn sm pri" data-act="pair" data-ip="${esc(f.ip)}" data-port="${num(f.panel_port)}" data-host="${esc(f.host)}">${L('Parear','Pair')}</button></div>`).join('')
+    :`<div class="empty" style="padding:26px">${ico('wifi')}<b>${L('Nenhuma máquina nova na rede','No new machine on the network')}</b>${L('As máquinas já pareadas não aparecem aqui. Instale o Byorzin Monitor em outro computador da mesma rede para vê-lo.','Paired machines do not show up here. Install Byorzin Monitor on another computer of the same network to see it.')}</div>`;
+}
+/* pareamento: código gerado aqui (com contagem regressiva) ou digitado aqui */
+let codeUntil=0,codeTotal=300;
+function codeIdle(t){$('codeBox').innerHTML=`<div class="codeph">${ico('key')}<span>${esc(t||L('Nenhum código ativo.','No active code.'))}</span></div>`}
+codeIdle();
+function codeTick(){if(!codeUntil)return;const left=Math.round(codeUntil-Date.now()/1000);
+  if(left<=0){codeUntil=0;codeIdle(L('Código expirado. Gere outro.','Code expired. Generate another one.'));$('btnCancel').hidden=true;return}
+  const e=$('codeLeft');if(e)e.textContent=L('expira em ','expires in ')+`${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}`;
+  const b=$('codeBar');if(b)b.style.width=Math.max(0,100*left/codeTotal)+'%'}
+setInterval(codeTick,1000);
+async function post(p,b){const r=await fetch(p,{method:'POST',headers:HDR,body:JSON.stringify(b||{})});
+  let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw new Error(j.erro||(L('erro ','error ')+r.status));return j}
+$('btnCode').onclick=async()=>{$('codeErr').textContent='';try{const r=await post('api/pair/code');codeUntil=r.expires_at;
+  codeTotal=Math.max(30,Math.round(codeUntil-Date.now()/1000));
+  const c=String(r.code||'');$('codeBox').innerHTML=`<div class="codebox" aria-label="${esc(c)}">${[...c.slice(0,3)].map(d=>`<span>${esc(d)}</span>`).join('')}<span class="gap"></span>${[...c.slice(3)].map(d=>`<span>${esc(d)}</span>`).join('')}</div>
+    <div class="codemeta"><span id="codeLeft" class="num"></span><div class="meter"><i id="codeBar" style="width:100%"></i></div></div>`;
+  $('btnCancel').hidden=false;codeTick()}catch(e){$('codeErr').textContent=e.message}};
+$('btnCancel').onclick=async()=>{try{await post('api/pair/cancel')}catch(e){}codeUntil=0;codeIdle(L('Código cancelado.','Code cancelled.'));$('btnCancel').hidden=true};
+for(const id of ['joinTarget','joinCode']){$(id).onfocus=()=>editing++;$(id).onblur=()=>editing=Math.max(0,editing-1)}
+function pairFound(ip,port,host){port=parseInt(port)||8788;
+  const okIp=/^[0-9a-fA-F:.]+$/.test(ip);$('joinTarget').value=okIp?`${ip}:${port}`:'';$('joinCode').value='';
+  const e=$('joinErr');e.className='msg okm';e.textContent='';
+  const b=document.createElement('b');b.textContent=host;
+  const a=document.createElement('a');a.target='_blank';a.rel='noopener noreferrer';a.textContent=L('abrir','open');
+  if(okIp)a.href=`http://${ip.includes(':')?'['+ip+']':ip}:${port}/#maquinas`;
+  e.append(L('Gere o código no painel de ','Generate the code in the panel of '),b,' (',a,L(') e digite-o aqui.',') and type it here.'));$('joinCode').focus()}
+$('btnJoin').onclick=async()=>{const e=$('joinErr');e.className='msg okm';e.textContent=L('Pareando…','Pairing…');
+  try{const r=await post('api/pair/join',{target:$('joinTarget').value,code:$('joinCode').value});
+    e.textContent=L(`Pareado com ${r.host}`,`Paired with ${r.host}`)+(r.peers.length?L(` e mais ${r.peers.length} máquina(s) do grupo`,` and ${r.peers.length} more machine(s) of the group`):'')+
+      (r.dropped.length?L(`. Saíram do grupo antigo: ${r.dropped.join(', ')}`,`. Left the old group: ${r.dropped.join(', ')}`):'')+'.';$('joinCode').value='';toast(L('Pareado','Paired'));setTimeout(load,2500)}
+  catch(err){e.className='msg';e.textContent=err.message}};
+async function unpair(url,name){if(!confirm(L(`Remover ${name}? Ela deixa de aparecer aqui e (se estiver online) também deixa de mostrar esta máquina.`,
+    `Remove ${name}? It stops showing up here and (if online) also stops showing this machine.`)))return;
+  try{const r=await post('api/machines/remove',{url});toast(L(`${name} removida`,`${name} removed`)+(r.other_side?L(' dos dois lados',' on both sides'):''));setTimeout(load,2500)}catch(e){toast(e.message,true)}}
+function renderAccounts(){const as=ST.accounts||[];$('acctSec').hidden=as.length<2;if(as.length<2||editing)return;
+  $('acctList').innerHTML=as.map(a=>`<div class="fm"><span class="av">${ico('user','sm')}</span>
+    <div><b>${esc(a.label)}</b><small>${esc((a.hosts||[]).join(', ')||L('sem máquina online','no machine online'))}${a.limits?` · ${L('semana','week')} ${a.week==null?'–':Math.round(num(a.week))+'%'} · 5h ${a.five==null?'–':Math.round(num(a.five))+'%'}`:a.id=='api'?' · '+L('sem limites de uso','no usage limits'):''}</small></div>
+    <input type="text" maxlength="24" value="${esc(a.custom?a.label:'')}" placeholder="${esc(a.default)}" data-chg="acct" data-id="${esc(a.id)}" aria-label="${L('Rótulo da conta','Account label')}"></div>`).join('')}
+function setAcctLabel(id,v){v=v.replace(/[\u0000-\u001f\u007f-\u009f]/g,'').trim().slice(0,24);
+  const al={...(ST.settings.account_labels||{})};if(v)al[id]=v;else delete al[id];save({account_labels:al},L('Conta: ','Account: ')+(v||L('rótulo padrão','default label')))}
+function setColor(h,c){if(!/^#[0-9a-fA-F]{6}$/.test(c))return;const cs={...(ST.settings.colors||{})};cs[h]=c;save({colors:cs},L('Cor de ','Color of ')+h)}
+function setHidden(h,hide){const s=new Set(ST.settings.hosts_hidden||[]);hide?s.add(h):s.delete(h);save({hosts_hidden:[...s]},hide?h+L(' oculta',' hidden'):h+L(' visível',' visible'))}
+
+/* ciclo */
+let lastUpd=null;
+async function load(){try{ST=await api('api/state')}catch(e){return}header();telaTab();checkAlerts();panelLink();
+  if(tab!='tela'&&(SCREEN===null||Date.now()-scrAt>30000))nowFrame();
+  if(ST.settings.updated_at!==lastUpd&&!editing){lastUpd=ST.settings.updated_at;renderLayouts();renderForm();renderScenes();renderMachines()}
+  else if(tab=='maquinas'&&!editing)renderMachines();
+  if(tab=='alertas'||!load.al){load.al=1;renderAlerts()}}
+function refresh(force){
+  if(tab=='tela')nowFrame();
+  if(tab=='historico'&&(!histAt||Date.now()-histAt>60000))loadHistory();
+  const sel=tab=='layouts'?'#lgrid':tab=='cenas'?'#sgrid':null;if(!sel)return;
+  if(!force&&Date.now()-(refresh.at||0)<4500)return;refresh.at=Date.now();
+  for(const i of document.querySelectorAll(sel+' img[data-src]')){const r=i.getBoundingClientRect();if(r.bottom<0||r.top>innerHeight)continue;
+    const n=new Image();n.onload=()=>{i.src=n.src;i.classList.add('ld')};n.src=i.dataset.src+'?data='+data+'&scale='+SC+'&t='+Date.now()}
+}
+document.addEventListener('load',e=>{if(e.target.tagName=='IMG')e.target.classList.add('ld')},true);
+/* prévia da Visão geral: o quadro que o painel desenha (/tela/frame.jpg, nítido com ?scale=); a tela física
+   (aqui ou num peer, /img/now.png) só diz onde ela está, consultada a cada ~10 s */
+let nowUrl=null,nowBusy=false,scrAt=0;
+async function screenWhere(){scrAt=Date.now();
+  try{const r=await fetch('img/now.png?t='+Date.now(),{cache:'no-store'});
+    if(r.ok){const h=decodeURIComponent(r.headers.get('X-Byorzin-Screen')||'');SCREEN=ST&&h==ST.machine?'here':h||'here'}else SCREEN='';
+    try{await r.body.cancel()}catch(e){}}catch(e){}}
+async function nowFrame(){if(nowBusy)return;nowBusy=true;
+  try{if(SCREEN===null||Date.now()-scrAt>10000)await screenWhere();
+    if(tab=='tela'){const r=await fetch(`tela/frame.jpg?scale=${SC}&t=${Date.now()}`,{cache:'no-store'});
+      if(r.ok){const u=URL.createObjectURL(await r.blob());$('now').src=u;if(nowUrl)URL.revokeObjectURL(nowUrl);nowUrl=u;
+        $('nowTime').textContent=new Date().toLocaleTimeString(LANG)}}
+    const live=!!SCREEN;
+    $('nowWhere').textContent=SCREEN=='here'?L('Ao vivo · tela plugada aqui','Live · screen plugged in here'):SCREEN?L('Ao vivo · tela em ','Live · screen on ')+SCREEN:
+      L('Prévia · nenhuma tela física conectada','Preview · no physical screen connected');
+    $('nowDot').className='dot'+(live?' live':'');screenPill()}
+  catch(e){}finally{nowBusy=false}}
+/* saídas de tela disponíveis nesta máquina */
+let TELAS=null;
+function telaOpts(){const e=$('telaOpts');if(!TELAS){e.innerHTML='';return}
+  e.innerHTML=`<span>${L('Saídas nesta máquina:','Outputs on this machine:')}</span>`+TELAS.map(t=>`<span class="o">${esc(t.backend+(t.kind=='usb'||t.kind=='framebuffer'?' · '+t.device:''))}</span>`).join('')}
+fetch('api/telas').then(r=>r.json()).then(ts=>{if(Array.isArray(ts)){TELAS=ts;telaOpts()}}).catch(()=>{});
+
+/* acesso de outro aparelho: link com a chave do painel (só aparece no navegador desta máquina) */
+let linkShown=false;
+async function panelLink(force){const box=$('linkBox');
+  if(!ST.access||!ST.access.local){box.hidden=true;$('linkNote').hidden=false;return}
+  $('linkNote').hidden=true;
+  if(linkShown&&!force)return;linkShown=true;
+  try{const r=await fetch('api/panel-url');if(!r.ok)return;const j=await r.json();
+    $('linkUrl').value=j.url||'';$('linkTela').value=j.tela||'';box.hidden=false;
+    $('linkOff').hidden=ST.access.auth!='off'}catch(e){}}
+for(const id of ['linkCopy','linkCopyTela'])$(id).onclick=async()=>{const i=$(id=='linkCopy'?'linkUrl':'linkTela');
+  try{await navigator.clipboard.writeText(i.value)}catch(e){i.select();document.execCommand('copy')}toast(L('Link copiado','Link copied'))};
+$('linkRotate').onclick=async()=>{if(!confirm(L('Gerar uma chave nova? Os aparelhos que já entraram precisarão do link novo.',
+  'Generate a new key? Devices that already signed in will need the new link.')))return;
+  try{await post('api/panel-key/rotate');await panelLink(true);toast(L('Chave nova gerada','New key generated'))}catch(e){toast(e.message,true)}};
+
+/* cliques e mudanças com dados vindos do servidor: por data-act / data-chg (sem onclick inline) */
+document.addEventListener('click',e=>{const t=e.target.closest('[data-act]');if(!t)return;const d=t.dataset;
+  if(d.act=='close')closeDrawer();
+  else if(d.act=='session')openSession(d.host,d.id);
+  else if(d.act=='use')useLayout(d.id);
+  else if(d.act=='force')force(d.mode);
+  else if(d.act=='unpair')unpair(d.url,d.name);
+  else if(d.act=='pair')pairFound(d.ip,d.port,d.host);
+  else if(d.act=='segk')segSet(t);
+  else if(d.act=='notif')askNotif();
+  else if(d.act=='beep')beep('done');
+  else if(d.act=='nav-open'){document.body.classList.add('nav-open');$('navScrim').classList.add('on')}
+  else if(d.act=='nav-close'){document.body.classList.remove('nav-open');$('navScrim').classList.remove('on')}});
+document.addEventListener('change',e=>{const t=e.target.closest('[data-chg]');if(!t)return;const d=t.dataset;
+  if(d.chg=='rot')toggleRot(d.id,t.checked);
+  else if(d.chg=='color')setColor(d.host,t.value);
+  else if(d.chg=='hidden')setHidden(d.host,!t.checked)
+  else if(d.chg=='acct')setAcctLabel(d.id,t.value)});
+/* campos criados depois (rótulo das contas): enquanto editados, a página não redesenha por cima */
+document.addEventListener('focusin',e=>{if(e.target.matches&&e.target.matches('[data-chg=acct]'))editing++});
+document.addEventListener('focusout',e=>{if(e.target.matches&&e.target.matches('[data-chg=acct]'))editing=Math.max(0,editing-1)});
+document.addEventListener('keydown',e=>{if(e.key=='Escape'){closeDrawer();document.body.classList.remove('nav-open');$('navScrim').classList.remove('on')}});
+
+/* ---------- alertas no navegador ---------- */
+let seenAlerts=null,AC=null,lastNotif=0;
+function beep(kind){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state=='suspended')AC.resume();
+  const notes=kind=='done'?[523,659,784]:[880,660];let t=AC.currentTime;
+  for(const f of notes){const o=AC.createOscillator(),g=AC.createGain();o.type='sine';o.frequency.value=f;
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.25,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+0.18);
+    o.connect(g).connect(AC.destination);o.start(t);o.stop(t+0.2);t+=0.16}}catch(e){}}
+function alertText(a){const n=a.label||a.project||L('sessão','session');
+  return a.type=='done'?[L('Terminou: ','Finished: ')+n,`${a.host} · `+L(`trabalhou ${Math.round((a.worked_s||0)/60)} min`,`worked ${Math.round((a.worked_s||0)/60)} min`)]
+    :[L('Esperando você: ','Waiting for you: ')+n,`${a.host} · ${a.reason||L('atenção','attention')}`]}
+function checkAlerts(){const al=ST.alerts||[];
+  if(seenAlerts===null){seenAlerts=new Set(al.map(a=>a.key));return}   // ao abrir o painel não avisa o que já passou
+  const fresh=al.filter(a=>!seenAlerts.has(a.key));for(const a of fresh)seenAlerts.add(a.key);
+  if(fresh.length&&tab=='alertas')renderAlerts();
+  if(!fresh.length||Date.now()-lastNotif<3000)return;lastNotif=Date.now();
+  const a=fresh[fresh.length-1],[t,b]=alertText(a);toast(t);
+  if(ST.settings.alert_sound)beep(a.type);
+  if(ST.settings.alert_browser&&'Notification' in window&&Notification.permission=='granted')
+    new Notification(t,{body:b,icon:'img/icon.png',tag:a.key});}
+async function askNotif(){if(!('Notification' in window))return toast(L('Este navegador não tem notificações','This browser has no notifications'),true);
+  const r=await Notification.requestPermission();beep('waiting');toast(r=='granted'?L('Notificações permitidas','Notifications allowed'):L('Permissão negada','Permission denied'),r!='granted')}
+
+/* ---------- detalhe da sessão (gaveta lateral) ---------- */
+const EVN={PreToolUse:['usou','used'],UserPromptSubmit:['você enviou mensagem','you sent a message'],PermissionRequest:['pediu permissão','asked permission'],Notification:['avisou','notified'],
+  SubagentStart:['iniciou agente','started agent'],SubagentStop:['agente terminou','agent finished'],Stop:['terminou o turno','finished the turn'],StopFailure:['falhou','failed'],SessionStart:['sessão aberta','session opened'],
+  PostToolUseFailure:['ferramenta falhou','tool failed'],PermissionDenied:['permissão negada','permission denied'],PreCompact:['compactando contexto','compacting context']};
+const evName=n=>EVN[n]?L(...EVN[n]):esc(n);
+/* duração em segundos (o ago() acima recebe um horário) */
+const dur=s=>(s=Math.max(0,num(s)))<60?Math.round(s)+' s':s<3600?Math.round(s/60)+' min':Math.floor(s/3600)+'h'+String(Math.round(s%3600/60)).padStart(2,'0');
+const fmtTok=v=>v>=1e9?(v/1e9).toFixed(1)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?Math.round(v/1e3)+'k':String(Math.round(v||0));
+let lastFocus=null;
+function openDrawer(){lastFocus=document.activeElement;$('drawer').classList.add('on');$('drawer').setAttribute('aria-hidden','false');$('scrim').classList.add('on');
+  setTimeout(()=>$('drawer').querySelector('[data-act=close]').focus(),50)}
+function closeDrawer(){if(!$('drawer').classList.contains('on'))return;$('drawer').classList.remove('on');$('drawer').setAttribute('aria-hidden','true');$('scrim').classList.remove('on');
+  if(lastFocus&&lastFocus.focus)lastFocus.focus()}
+async function openSession(host,id){$('dHead').innerHTML=`<h3 id="dTitle"><span class="sk" style="width:200px"></span></h3>`;
+  $('mbody').innerHTML=`<div class="empty"><span class="sk" style="width:80%"></span><span class="sk" style="width:60%"></span><span class="sk" style="width:70%"></span></div>`;openDrawer();
+  let r;try{r=await fetch(`api/session?host=${encodeURIComponent(host)}&id=${encodeURIComponent(id)}`)}catch(e){r={ok:false}}
+  if(!r.ok){$('dHead').innerHTML=`<h3 id="dTitle">${L('Sessão','Session')}</h3>`;
+    $('mbody').innerHTML=`<div class="empty"><img src="img/icon.png" alt=""><b>${L('Sessão não encontrada','Session not found')}</b>${L('Ela encerrou ou a máquina não respondeu.','It ended or the machine did not answer.')}</div>`;return}
+  const d=await r.json(),s=d.session,now=num(d._now)||Date.now()/1000,llm=s.kind=='llm';
+  const rows=[[L('Projeto','Project'),s.project],[L('Máquina','Machine'),d.host],[L('Conta','Account'),acctName(s.account)||null],[L('Modelo','Model'),s.model],
+    [L('Ferramenta','Tool'),s.tool],
+    [L('Contexto','Context'),s.context_pct!=null?Math.round(num(s.context_pct))+'%':null],[L('Tokens (8 dias)','Tokens (8 days)'),llm?null:fmtTok(s.tokens)],
+    [L('Custo estimado','Estimated cost'),s.cost_usd!=null?'US$ '+Number(s.cost_usd).toFixed(2):null],['VRAM',s.vram_gb?num(s.vram_gb)+' GB':null],
+    [L('Aberta há','Open for'),s.since?dur(now-s.since):null],[L('Última atividade','Last activity'),s.last?L('há '+dur(now-s.last),dur(now-s.last)+' ago'):null]].filter(r=>r[1]!=null&&r[1]!=='');
+  const subs=s.subagents||[],evs=d.events||[];
+  $('dHead').innerHTML=`<h3 id="dTitle">${esc(s.title||s.project)}</h3><div class="toolbar"><span class="pill ${esc(s.status)}">${esc(stName(s.status))}</span>${llm?`<span class="pill llm nodot">${L('LLM local','local LLM')}</span>`:''}
+    <span class="muted" style="font-size:12.5px;display:inline-flex;align-items:center;gap:6px"><span class="dot" style="background:${ST?hostColor(d.host):'var(--idle)'}"></span>${esc(d.host)}</span></div>`;
+  $('mbody').innerHTML=`<dl class="props">${rows.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+   ${s.context_pct!=null?`<div class="meter" style="margin:12px 0 0"><i style="width:${num(s.context_pct)}%;background:${lvl(num(s.context_pct))}"></i></div>`:''}
+   ${llm?'':`<h4>${ico('agents','xs')}${L('Subagentes','Subagents')} · ${subs.length}</h4>${subs.length?`<div class="agents">${subs.map(a=>`<div>${ico('agents','xs')}<b>${esc(a.type||L('agente','agent'))}</b><span>${esc(a.tool||L('pensando','thinking'))}</span></div>`).join('')}</div>`:`<p class="muted" style="margin:0;font-size:13px">${L('Nenhum rodando agora.','None running now.')}</p>`}
+   <h4>${ico('activity','xs')}${L('Últimos eventos','Latest events')}</h4>${evs.length?`<div class="tl">${evs.map(e=>`<div><small>${esc(L('há '+dur(now-e.ts),dur(now-e.ts)+' ago'))}</small><span>${e.sub&&!String(e.hook_event_name||'').startsWith('Subagent')?L('agente: ','agent: '):''}${evName(e.hook_event_name)} <b>${esc(e.tool_name||e.agent_type||e.notification_type||e.error||'')}</b></span></div>`).join('')}</div>`:`<p class="muted" style="margin:0;font-size:13px">${L('Nenhum evento desde que o coletor subiu.','No events since the collector started.')}</p>`}`}`}
+
+/* ---------- histórico ---------- */
+let histN=30,histAt=0,lastHist=null;
+for(const b of $$('#histSeg button'))b.onclick=()=>{histN=+b.dataset.n;
+  for(const x of $$('#histSeg button'))x.classList.toggle('on',x==b);loadHistory()};
+function hbars(el,items,fmt,color){const max=Math.max(1,...items.map(i=>num(i[1])));
+  $(el).innerHTML=items.length?items.slice(0,8).map(([k,v,c],i)=>`<div class="r"><em>${i+1}</em><span title="${esc(k)}">${esc(k)}</span><div class="tr"><i style="width:${Math.max(1,100*num(v)/max)}%${c||color?';background:'+(c?inkColor(safeColor(c)):color):''}"></i></div><b>${esc(fmt(v))}</b></div>`).join('')
+    :`<div class="empty" style="padding:18px">${L('Sem dados no período.','No data in this period.')}</div>`}
+const fmtH=s=>s>=3600?(LANG=='en'?(s/3600).toFixed(1):(s/3600).toFixed(1).replace('.',','))+' h':Math.round(s/60)+' min';
+const dayLabel=d=>LANG=='en'?`${d.slice(5,7)}/${d.slice(8,10)}`:`${d.slice(8,10)}/${d.slice(5,7)}`;
+function tokChart(h){const box=$('histTok'),n=h.dates.length,W=Math.max(320,box.clientWidth-36),H=W<600?200:260,pl=44,pb=26,pt=10,cw=(W-pl)/n,gap=Math.min(6,Math.max(1,cw*.28)),bw=Math.max(2,cw-gap);
+  const tot=h.dates.map((_,i)=>h.hosts.reduce((a,x)=>a+(h.tokens[x][i]||0),0)),max=Math.max(1,...tot);
+  const step=Math.pow(10,Math.floor(Math.log10(max))),nice=Math.ceil(max/step)*step,y=v=>pt+(H-pt-pb)*(1-v/nice);
+  let g='';for(let k=0;k<=4;k++){const v=nice*k/4;g+=`<line class="gl" x1="${pl}" x2="${W}" y1="${y(v)}" y2="${y(v)}"${k==0?' style="stroke-dasharray:none"':''}/><text class="ax" x="${pl-10}" y="${y(v)+4}" text-anchor="end">${fmtTok(v)}</text>`}
+  let bars='',hit='';const every=Math.ceil(n/(W<600?5:10));
+  h.dates.forEach((d,i)=>{let acc=0;const x=pl+i*cw+gap/2;const top=h.hosts.filter(x=>h.tokens[x][i]).pop();
+    h.hosts.forEach(host=>{const v=h.tokens[host][i]||0;if(!v)return;const y0=y(acc),y1=y(acc+v);acc+=v;const c=inkColor(hostColor(host)),ht=Math.max(1,y0-y1-(host!=top?1.5:0));
+      bars+=host==top&&ht>3?`<path d="M${x} ${y0}V${y1+3}q0-3 3-3h${bw-6}q3 0 3 3V${y0}z" fill="${c}"/>`:`<rect x="${x}" y="${y1}" width="${bw}" height="${ht}" fill="${c}"/>`});
+    hit+=`<rect x="${pl+i*cw}" y="${pt}" width="${cw}" height="${H-pt-pb}" fill="transparent" data-i="${i}"/>`;
+    if(i%every==0)bars+=`<text class="ax" x="${x+bw/2}" y="${H-6}" text-anchor="middle">${esc(dayLabel(d))}</text>`});
+  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${L('tokens por dia','tokens per day')}">${g}<rect class="hc" id="hcol" x="0" y="${pt}" width="${cw}" height="${H-pt-pb}" rx="4" style="display:none"/>${bars}${hit}</svg>`;
+  $('histLg').innerHTML=h.hosts.map(x=>`<span><i style="background:${inkColor(hostColor(x))}"></i>${esc(x)}</span>`).join('');
+  const tt=$('ttip'),hc=$('hcol');for(const r of box.querySelectorAll('rect[data-i]')){
+    r.onmousemove=e=>{const i=+r.dataset.i;hc.style.display='';hc.setAttribute('x',pl+i*cw);
+      tt.innerHTML=`<b>${esc(new Date(h.dates[i]+'T12:00').toLocaleDateString(LANG,{weekday:'short',day:'numeric',month:'short'}))}</b>`+
+      h.hosts.map(x=>`<div class="tr"><i style="background:${inkColor(hostColor(x))}"></i><span>${esc(x)}</span><em>${fmtTok(num(h.tokens[x][i]))}</em></div>`).join('')+
+      `<div class="ft">${L('sessões','sessions')} ${num(h.sessions[i])} · ${L('trabalho','work')} ${fmtH(num(h.work_s[i]))}</div>`;
+      tt.style.display='block';const w=tt.offsetWidth;tt.style.left=Math.min(innerWidth-w-8,e.clientX+14)+'px';tt.style.top=(e.clientY+14)+'px'};
+    r.onmouseleave=()=>{tt.style.display='none';hc.style.display='none'}}}
+let rsz;addEventListener('resize',()=>{clearTimeout(rsz);rsz=setTimeout(()=>{if(lastHist&&tab=='historico')tokChart(lastHist)},150)});
+async function loadHistory(){histAt=Date.now();let h;
+  if(!lastHist)$('histKpi').innerHTML=Array(6).fill('<div class="card kpi"><span class="sk" style="width:70px"></span><div class="v"><span class="sk" style="width:90px"></span></div></div>').join('');
+  try{h=await api('api/history?days='+histN)}catch(e){return}lastHist=h;
+  const sum=a=>a.reduce((x,y)=>x+y,0),tt=sum(h.hosts.map(x=>sum(h.tokens[x])));
+  $('histErr').hidden=!h.errors.length;$('histErr').textContent=h.errors.length?L('sem resposta: ','no answer: ')+h.errors.join(', '):'';
+  $('histKpi').innerHTML=[['coins','Tokens',fmtTok(tt)],['activity',L('Sessões','Sessions'),nfmt(sum(h.sessions))],['clock',L('Tempo trabalhando','Time working'),fmtH(sum(h.work_s))],
+    ['hand',L('Mensagens suas','Your messages'),nfmt(sum(h.prompts))],['agents',L('Agentes iniciados','Agents started'),nfmt(sum(h.agents.map(a=>a[1])))],['calendar',L('Média por dia','Daily average'),fmtTok(tt/h.days)]]
+    .map(([i,k,v])=>`<div class="card kpi"><span class="over">${ico(i,'xs')}${esc(k)}</span><div class="v num">${esc(v)}</div></div>`).join('');
+  tokChart(h);
+  hbars('histHost',h.hosts.map(x=>[x,h.by_host[x].tokens,hostColor(x)]).sort((a,b)=>b[1]-a[1]),fmtTok);
+  hbars('histModel',h.models,fmtTok,'var(--rot)');hbars('histTools',h.tools,nfmt,'var(--working)');hbars('histAgents',h.agents,nfmt,'var(--waiting)')}
+
+load().then(()=>{const h=(location.hash||'#tela').slice(1);showTab($('t-'+h)?h:'tela');setInterval(refresh,1500);setInterval(load,4000)});
+</script>
+</body>
+</html>

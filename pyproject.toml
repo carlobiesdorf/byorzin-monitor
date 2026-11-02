@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "byorzin-monitor"
+dynamic = ["version"]
+description = "Byorzin — shared agent monitor for Claude Code: every session and subagent from all your computers on a tiny USB screen, a browser or a terminal."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "LICENSE-ASSETS.md"]
+authors = [{ name = "Byorzin Monitor contributors" }]
+requires-python = ">=3.11"
+dependencies = ["pyserial>=3.5", "pillow>=10", "numpy>=1.26", "cairosvg>=2.7"]
+keywords = ["claude", "claude-code", "agents", "monitor", "turing-smart-screen", "dashboard", "mascot"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Environment :: Web Environment",
+  "Intended Audience :: Developers",
+  "Natural Language :: English",
+  "Natural Language :: Portuguese (Brazilian)",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: System :: Monitoring",
+  "Topic :: System :: Hardware",
+]
+
+[project.urls]
+Homepage = "https://github.com/carlobiesdorf/byorzin-monitor"
+Issues = "https://github.com/carlobiesdorf/byorzin-monitor/issues"
+Changelog = "https://github.com/carlobiesdorf/byorzin-monitor/blob/main/CHANGELOG.md"
+
+[project.scripts]
+byorzin-monitor = "byorzin_monitor.entry:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "byorzin_monitor.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["byorzin_monitor*"]
+
+[tool.setuptools.package-data]
+byorzin_monitor = ["panel/static/*"]
