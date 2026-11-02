@@ -8,6 +8,37 @@ All notable changes to this project are documented here. The format follows
 
 ### Planned
 - OpenAI Codex CLI as a second provider (sessions, tools, context, 5h/weekly limits).
+- Windows support.
+
+## [0.10.0] — macOS (beta)
+
+### Added
+- **macOS support (beta)**, Intel and Apple Silicon. `byorzin-monitor setup` installs three launchd
+  agents in `~/Library/LaunchAgents` (collector, panel and screen), with no sudo; `doctor` and
+  `uninstall` know about them. Config and data live in `~/Library/Application Support/byorzin-monitor`
+  (`XDG_CONFIG_HOME`/`XDG_STATE_HOME` still win when set). Requires `brew install cairo`.
+- USB screens on macOS: no udev there, so the screen agent runs `display --wait`, which waits for a
+  known screen (`/dev/cu.usbmodem…`) to be plugged in; when the cable is pulled, launchd starts it
+  again and it goes back to waiting.
+- `display --wait` option (any system) and `setup --no-services` (configure only, no services or
+  screen; for tests and containers).
+- DejaVu Sans fonts bundled with the package, used when the system has none (macOS). On Linux the
+  system fonts are still used, so the screen is pixel-for-pixel the same.
+- macOS sessions are matched by PID **and** process start time (the `procStart` Claude Code writes,
+  compared with `ps -o lstart`), so a reused PID does not keep a dead session alive.
+- `setup` and `doctor` on macOS explain the Local Network permission (macOS 15+) that the
+  launchd agents need to reach other computers.
+- CI runs the whole test suite on Linux **and macOS** (Apple Silicon, Python 3.11–3.13, plus Intel
+  with 3.12), an end-to-end smoke test with a fake home folder and no `XDG_*` variables (setup,
+  hooks, status line, collector, panel, `/tela`, `display --png`, `doctor`), the launchd files
+  checked with `plutil`, and the launchd agents installed for real, checked and removed.
+
+### Changed
+- What depends on the operating system (process alive, CPU, memory, uptime, temperature, Cairo
+  lookup) moved to `byorzin_monitor/sysinfo.py`. Linux behaviour is unchanged.
+- Hints in error messages (restart a service, read its log) show the right command for each system.
+- The hostname on macOS drops the `.local` suffix.
+- CI actions updated (`actions/checkout@v5`, `actions/setup-python@v6`).
 
 ## [0.9.0] — first public release
 

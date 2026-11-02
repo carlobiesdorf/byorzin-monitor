@@ -13,7 +13,7 @@
   <a href="https://github.com/carlobiesdorf/byorzin-monitor/actions/workflows/ci.yml"><img src="https://github.com/carlobiesdorf/byorzin-monitor/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-39ff88" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-3776ab" alt="Python 3.11+">
-  <img src="https://img.shields.io/badge/platform-Linux-555" alt="Platform: Linux">
+  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20(beta)-555" alt="Platform: Linux | macOS (beta)">
 </p>
 
 <p align="center">
@@ -46,8 +46,10 @@ sleeps (and dreams about your stats) when nobody is around.
 
 ## Quick start
 
-Requirements: Linux, Python 3.11+, Claude Code, and Cairo + DejaVu fonts
-(`sudo apt install libcairo2 fonts-dejavu-core` on Debian/Ubuntu).
+Requirements: Linux or macOS (beta), Python 3.11+, Claude Code, and the Cairo library:
+
+- **Debian/Ubuntu:** `sudo apt install libcairo2 fonts-dejavu-core pipx`
+- **macOS** (Intel or Apple Silicon, with [Homebrew](https://brew.sh)): `brew install cairo pipx`
 
 **1. Install**
 
@@ -72,6 +74,13 @@ the Claude Code hooks (it shows the change to `~/.claude/settings.json` and asks
 for sudo once for the system part (USB screen permissions, udev rule, firewall): with a supported
 screen, the screen then turns on by itself whenever you plug it in. Without a screen, the same
 setup leaves the panel and `/tela` ready. Use `--no-sudo` to skip the sudo steps.
+
+On **macOS** the same command installs three launchd agents (collector, panel and screen) in
+`~/Library/LaunchAgents`, with no sudo: the USB screen needs no driver and is picked up when you
+plug it in. Config and data live in `~/Library/Application Support/byorzin-monitor`. With more
+than one computer, macOS 15+ asks once for **Local Network** access for Python: allow it (if you
+said no: System Settings → Privacy & Security → Local Network). If the macOS firewall is on, it may
+also ask whether Python can accept incoming connections: allow it too.
 
 **3. Open the panel**
 
@@ -149,6 +158,9 @@ Every backend draws the same frames. Details: [docs/telas.md](docs/telas.md) (Po
 | WeAct Studio Display FS 3.5" / 0.96" | `weact` / `weact-096` | experimental |
 | Other USB screens | — | not supported yet (protocol contributions welcome) |
 
+On macOS the USB screens show up as `/dev/cu.usbmodem…` and are detected the same way; the
+framebuffer backend is Linux-only.
+
 *Experimental* = written from public protocol documentation and unit-tested, but not yet tried on
 real hardware. Own one? Run `byorzin-monitor display --backend <name>` and tell us in an issue.
 
@@ -225,6 +237,16 @@ background.
 </details>
 
 <details>
+<summary><b>Does it run on macOS? And Windows?</b></summary>
+
+**macOS: yes, in beta.** Collector, panel, `/tela`, hooks and USB screens work on macOS
+(Intel and Apple Silicon) and every change runs the full test suite and an end-to-end test on a
+macOS machine in CI. It is called beta until people confirm it on real Macs with a USB screen:
+if you try it, please tell us in an issue. CPU temperature is not shown on macOS (it needs root).
+**Windows** is not supported yet; it is on the roadmap.
+</details>
+
+<details>
 <summary><b>How do I uninstall?</b></summary>
 
 `byorzin-monitor uninstall` (add `--purge` to also delete config and data), then
@@ -235,14 +257,14 @@ background.
 
 | Command | What it does |
 |---|---|
-| `byorzin-monitor setup` | install or update on this computer (`--no-sudo`, `--no-claude`, `-y`) |
+| `byorzin-monitor setup` | install or update on this computer (`--no-sudo`, `--no-claude`, `--no-services`, `-y`) |
 | `byorzin-monitor doctor` | diagnose services, screen, hooks, ports and peers |
 | `byorzin-monitor status` | sessions and machines at a glance |
 | `byorzin-monitor pair [<ip> <code>]` | generate a pairing code, or join another computer's group |
 | `byorzin-monitor machines` | paired machines and machines found on the network |
 | `byorzin-monitor panel-url` | link to open the panel on another device |
 | `byorzin-monitor display --backend <name>` | run a screen in the foreground (`web`, `terminal`, `turing-a`…) |
-| `byorzin-monitor uninstall [--purge]` | remove services, udev rule and hooks |
+| `byorzin-monitor uninstall [--purge]` | remove services (systemd/udev or launchd) and hooks |
 
 The CLI messages are currently in Portuguese.
 
@@ -266,6 +288,7 @@ turn them on). Threat model and how to report a vulnerability: [SECURITY.md](SEC
   Each provider gets its own Byorzin color.
 - Native layouts for big screens (16:9 monitors and TVs) and portrait displays.
 - More USB screens tested on real hardware — help welcome (see `docs/telas.md`).
+- macOS out of beta (needs reports from real Macs), then **Windows**.
 
 ## Contributing
 

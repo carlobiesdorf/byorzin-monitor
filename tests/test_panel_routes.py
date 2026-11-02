@@ -28,7 +28,8 @@ class TestRoutes(unittest.TestCase):
         cfg = common.load_config()
         assert cfg["port"] == 58797, "ambiente de teste não isolado"
         common.ensure_state_dir()
-        start = Path("/proc/self/stat").read_text().rsplit(")", 1)[1].split()[19]
+        from byorzin_monitor.sysinfo import proc_start
+        start = proc_start(os.getpid())      # None no macOS (lá vale só o PID)
         (common.CLAUDE_DIR / "sessions" / "t.json").write_text(json.dumps(
             {"sessionId": SID, "pid": os.getpid(), "procStart": start, "cwd": "/x/meu-projeto",
              "startedAt": (time.time() - 900) * 1000}))

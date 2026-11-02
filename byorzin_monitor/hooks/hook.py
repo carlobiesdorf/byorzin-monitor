@@ -19,8 +19,12 @@ STOP_ERRORS = {"rate_limit", "overloaded", "authentication_failed", "billing_err
 
 
 def state_dir():
-    base = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
-    return os.path.join(base, "byorzin-monitor")
+    """Mesma pasta que common.STATE_DIR (repetida aqui para não importar o pacote)."""
+    if os.environ.get("XDG_STATE_HOME"):
+        return os.path.join(os.environ["XDG_STATE_HOME"], "byorzin-monitor")
+    if sys.platform == "darwin":
+        return os.path.join(os.path.expanduser("~"), "Library", "Application Support", "byorzin-monitor", "state")
+    return os.path.join(os.path.expanduser("~"), ".local", "state", "byorzin-monitor")
 
 
 def _known(v, allowed):

@@ -2,14 +2,21 @@
 import json
 import os
 import socket
+import sys
 import tomllib
 from pathlib import Path
 
 HOME = Path.home()
 CLAUDE_DIR = Path(os.environ.get("CLAUDE_CONFIG_DIR", HOME / ".claude"))
 APP = "byorzin-monitor"
-STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", HOME / ".local/state")) / APP
-CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / APP
+if sys.platform == "darwin":
+    # macOS: pasta padrão do sistema; XDG_* (se definidas) continuam valendo, como nos testes
+    _MAC = HOME / "Library" / "Application Support"
+    STATE_DIR = Path(os.environ["XDG_STATE_HOME"]) / APP if os.environ.get("XDG_STATE_HOME") else _MAC / APP / "state"
+    CONFIG_DIR = Path(os.environ["XDG_CONFIG_HOME"]) / APP if os.environ.get("XDG_CONFIG_HOME") else _MAC / APP
+else:
+    STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", HOME / ".local/state")) / APP
+    CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / APP
 CONFIG_FILE = CONFIG_DIR / "config.toml"
 # nomes da versão anterior (claude-monitor), usados só na migração
 LEGACY_STATE_DIR = STATE_DIR.parent / "claude-monitor"
@@ -25,7 +32,8 @@ DEFAULTS = {
     "bind": "0.0.0.0",
     "token": "",
     "peers": [],                 # ex.: ["http://192.168.1.10:8787"]
-    "hostname": socket.gethostname(),
+    # macOS devolve "MacBook-Pro.local"; o ".local" só ocupa espaço na tela
+    "hostname": socket.gethostname().removesuffix(".local") if sys.platform == "darwin" else socket.gethostname(),
     "statusline_chain": "",      # comando da status line anterior, se houver
     "panel_port": 8788,
     "backend": "auto",           # tela: auto | turing-a | ... (ver display/backends)

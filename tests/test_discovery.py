@@ -1,4 +1,5 @@
 import json
+import sys
 import time
 import unittest
 
@@ -14,6 +15,9 @@ class FakeLive:
         return self.cfg
 
 
+# o teste usa broadcast no loopback (127.255.255.255), que só o Linux entrega: no macOS o lo0 não
+# tem broadcast. A descoberta de verdade usa 255.255.255.255 na rede local.
+@unittest.skipIf(sys.platform == "darwin", "loopback sem broadcast no macOS")
 class TestDiscovery(unittest.TestCase):
     def test_duas_instancias(self):
         dport = _isolate.free_port("udp")

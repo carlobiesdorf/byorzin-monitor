@@ -14,6 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs
 
+from byorzin_monitor import sysinfo
 from byorzin_monitor.account import identify as identify_account, rate_accounts, valid_id as valid_account
 from byorzin_monitor.common import (CLAUDE_DIR, EVENTS_FILE, RATE_FILE, SESSION_INFO_DIR, TOKENS_FILE,
                      ensure_state_dir, load_config, read_json, write_json_atomic)
@@ -35,15 +36,7 @@ def log(*a):
 
 
 # ---------------------------------------------------------------- sessões
-def _pid_alive(pid, proc_start):
-    try:
-        stat = Path(f"/proc/{pid}/stat").read_text()
-    except OSError:
-        return False
-    if proc_start:
-        start = stat.rsplit(")", 1)[1].split()[19]
-        return start == str(proc_start)
-    return True
+_pid_alive = sysinfo.pid_alive      # Linux: /proc; macOS: kill(pid, 0)
 
 
 def read_sessions():
@@ -401,8 +394,7 @@ class HostMetrics:
         self.ollama_url = (ollama_url or "http://127.0.0.1:11434").rstrip("/")
 
     def _cpu_pct(self):
-        v = list(map(int, Path("/proc/stat").read_text().split("\n", 1)[0].split()[1:]))
-        idle, total = v[3] + v[4], sum(v)
+        idle, total = sysinfo.cpu_times()
         prev, self._cpu = self._cpu, (idle, total)
         if not prev or total == prev[1]:
             return None
@@ -412,10 +404,8 @@ class HostMetrics:
         d = {}
         try:
             d["cpu"] = self._cpu_pct()
-            mi = {l.split(":")[0]: int(l.split()[1]) for l in Path("/proc/meminfo").read_text().splitlines() if l.split()[1:]}
-            d["ram_used_gb"] = round((mi["MemTotal"] - mi["MemAvailable"]) / 1048576, 1)
-            d["ram_total_gb"] = round(mi["MemTotal"] / 1048576, 1)
-            d["uptime_s"] = int(float(Path("/proc/uptime").read_text().split()[0]))
+            d["ram_used_gb"], d["ram_total_gb"] = sysinfo.memory_gb()
+            d["uptime_s"] = sysinfo.uptime_s()
             d["cores"] = os.cpu_count()
         except Exception:
             pass
@@ -450,15 +440,7 @@ class HostMetrics:
                 pass
         self.data = d
 
-    @staticmethod
-    def _cpu_temp():
-        for hw in Path("/sys/class/hwmon").glob("hwmon*"):
-            try:
-                if (hw / "name").read_text().strip() in ("k10temp", "coretemp", "zenpower", "cpu_thermal"):
-                    return int((hw / "temp1_input").read_text()) / 1000
-            except OSError:
-                continue
-        return None
+    _cpu_temp = staticmethod(sysinfo.cpu_temp)
 
 
 # ---------------------------------------------------------------- coletor
@@ -659,7 +641,8 @@ def bind_server(bind, port, handler, what):
     except OSError as e:
         if e.errno == errno.EADDRINUSE:
             raise PortInUse(f"a porta {port} ({what}) já está em uso em {bind}: outro byorzin-monitor já está "
-                            f"rodando (systemctl --user status byorzin-monitor-*) ou outro programa usa a porta. "
+                            f"rodando ({'launchctl list | grep byorzin' if sysinfo.MACOS else 'systemctl --user status byorzin-monitor-*'}) "
+                            f"ou outro programa usa a porta. "
                             f"Troque `{'port' if what == 'coletor' else 'panel_port'}` no config.toml ou pare o outro.") from None
         if e.errno == errno.EADDRNOTAVAIL:
             raise PortInUse(f"endereço {bind} não existe nesta máquina (bind no config.toml)") from None

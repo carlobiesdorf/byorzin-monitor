@@ -45,4 +45,4 @@ version = {attr = "byorzin_monitor.__version__"}
 include = ["byorzin_monitor*"]
 
 [tool.setuptools.package-data]
-byorzin_monitor = ["panel/static/*"]
+byorzin_monitor = ["panel/static/*", "display/fonts/*"]

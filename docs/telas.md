@@ -36,6 +36,15 @@ device = "/dev/ttyACM0"
 
 ou na linha de comando: `byorzin-monitor display --backend turing-b --device /dev/ttyACM0`.
 
+### No macOS (beta)
+
+Não há udev: o `setup` instala o agente `com.byorzin-monitor.display` do launchd, que roda
+`byorzin-monitor display --wait` o tempo todo. Sem tela, ele só espera (verifica a cada 3 s);
+ao plugar, começa a desenhar; ao desplugar, o processo sai e o launchd o sobe de novo em 10 s,
+voltando a esperar. A tela aparece como `/dev/cu.usbmodem…` (sem driver e sem grupo `dialout`).
+O `config.toml` fica em `~/Library/Application Support/byorzin-monitor/` e o log da tela em
+`~/Library/Application Support/byorzin-monitor/state/display.log`.
+
 ## Navegador (`web`)
 
 O painel serve a página **`http://<máquina>:8788/tela`**: o Byorzin em tela cheia, fundo preto,

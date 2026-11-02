@@ -3,7 +3,11 @@
 # Cores em atributos inline (cairosvg não entende var()), humor é parâmetro
 # e há `gordura` (0..1) que alarga corpo, braços, pernas e sombra.
 import io
-import cairosvg
+
+from byorzin_monitor.sysinfo import prepare_cairo
+
+prepare_cairo()     # macOS: acha o cairo do Homebrew (no Linux não faz nada)
+import cairosvg  # noqa: E402
 from PIL import Image, ImageChops, ImageDraw
 
 CORES = dict(neon="#39ff88", glow="#a8ffc9", shell_hi="#eef8f8", shell="#b9d2d6", shell_lo="#6f8f95",

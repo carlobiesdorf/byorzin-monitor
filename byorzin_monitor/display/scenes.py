@@ -8,12 +8,14 @@
 # do SVG. Com K=1 (tela USB, terminal, framebuffer) nada muda: é o ImageDraw puro de sempre.
 import contextvars
 import math
+import os
 import time
 import zlib
 from datetime import datetime
 from collections import OrderedDict
 from contextlib import contextmanager
 from functools import lru_cache
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
@@ -28,7 +30,18 @@ CYAN = (90, 200, 255); GREEN = (90, 220, 140); YEL = (250, 200, 60); RED = (240,
 # cor por máquina: neon do Byorzin escolhido pelo nome da máquina (hash estável), a menos que o
 # painel tenha definido outra (settings `colors`). A primeira é o verde neon do Byorzin.
 PALETTE = ["#39ff88", "#b388ff", "#5ac8ff", "#ffb020", "#ff7a5c", "#c6ff4d"]
-FONT_DIR = "/usr/share/fonts/truetype/dejavu/"
+SYSTEM_FONT_DIR = "/usr/share/fonts/truetype/dejavu/"
+BUNDLED_FONT_DIR = str(Path(__file__).resolve().parent / "fonts") + "/"
+
+
+def _font_dir():
+    """Fontes DejaVu do sistema (Linux, como sempre); sem elas (macOS), as que vêm no pacote."""
+    if os.path.exists(SYSTEM_FONT_DIR + "DejaVuSans-Bold.ttf") and os.path.exists(SYSTEM_FONT_DIR + "DejaVuSans.ttf"):
+        return SYSTEM_FONT_DIR
+    return BUNDLED_FONT_DIR
+
+
+FONT_DIR = _font_dir()
 
 
 COLOR_OVERRIDE = {}     # host -> "#rrggbb" (painel); preenchido por set_colors()

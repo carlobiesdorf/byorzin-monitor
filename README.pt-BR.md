@@ -13,7 +13,7 @@
   <a href="https://github.com/carlobiesdorf/byorzin-monitor/actions/workflows/ci.yml"><img src="https://github.com/carlobiesdorf/byorzin-monitor/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-39ff88" alt="Licença: MIT"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-3776ab" alt="Python 3.11+">
-  <img src="https://img.shields.io/badge/platform-Linux-555" alt="Plataforma: Linux">
+  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20(beta)-555" alt="Plataforma: Linux | macOS (beta)">
 </p>
 
 <p align="center">
@@ -48,8 +48,10 @@ termina e dorme (sonhando com as suas estatísticas) quando ninguém está usand
 
 ## Começo rápido
 
-Requisitos: Linux, Python 3.11+, Claude Code, e Cairo + fontes DejaVu
-(`sudo apt install libcairo2 fonts-dejavu-core` no Debian/Ubuntu).
+Requisitos: Linux ou macOS (beta), Python 3.11+, Claude Code e a biblioteca Cairo:
+
+- **Debian/Ubuntu:** `sudo apt install libcairo2 fonts-dejavu-core pipx`
+- **macOS** (Intel ou Apple Silicon, com o [Homebrew](https://brew.sh)): `brew install cairo pipx`
 
 **1. Instale**
 
@@ -74,6 +76,13 @@ adiciona os hooks do Claude Code (mostra a mudança no `~/.claude/settings.json`
 Pede sudo uma vez para a parte de sistema (permissões da tela USB, regra udev, firewall): com uma
 tela suportada, ela liga sozinha sempre que você plugar. Sem tela, o mesmo setup deixa o painel e a
 `/tela` prontos. Use `--no-sudo` para pular os passos com sudo.
+
+No **macOS** o mesmo comando instala três agentes do launchd (coletor, painel e tela) em
+`~/Library/LaunchAgents`, sem sudo: a tela USB não precisa de driver e é reconhecida ao ser plugada.
+Configuração e dados ficam em `~/Library/Application Support/byorzin-monitor`. Com mais de um
+computador, o macOS 15 ou mais novo pede uma vez acesso à **Rede Local** para o Python: permita (se
+negou: Ajustes do Sistema → Privacidade e Segurança → Rede Local). Se o firewall do macOS estiver
+ligado, ele também pode perguntar se o Python aceita conexões: permita.
 
 **3. Abra o painel**
 
@@ -150,6 +159,9 @@ Todos os backends desenham os mesmos quadros. Detalhes: [docs/telas.md](docs/tel
 | XuanFang 3.5" rev B | `turing-b` | experimental |
 | WeAct Studio Display FS 3.5" / 0.96" | `weact` / `weact-096` | experimental |
 | Outras telas USB | — | ainda não suportadas (contribuições de protocolo são bem-vindas) |
+
+No macOS as telas USB aparecem como `/dev/cu.usbmodem…` e são detectadas do mesmo jeito; o
+backend de framebuffer é só do Linux.
 
 *Experimental* = escrito a partir da documentação pública do protocolo e com testes automatizados,
 mas ainda sem teste em hardware real. Tem uma? Rode `byorzin-monitor display --backend <nome>` e
@@ -228,6 +240,16 @@ Não. O hook acrescenta uma linha JSON por evento e sai; o coletor faz o resto e
 </details>
 
 <details>
+<summary><b>Funciona no macOS? E no Windows?</b></summary>
+
+**macOS: sim, em beta.** Coletor, painel, `/tela`, hooks e telas USB funcionam no macOS (Intel e
+Apple Silicon), e cada mudança roda todos os testes e um teste de ponta a ponta numa máquina macOS
+no CI. Fica como beta até as pessoas confirmarem em Macs de verdade com a tela USB: se você testar,
+conte num issue. A temperatura da CPU não aparece no macOS (precisa de root).
+**Windows** ainda não é suportado; está nos próximos passos.
+</details>
+
+<details>
 <summary><b>Como desinstalo?</b></summary>
 
 `byorzin-monitor uninstall` (com `--purge` apaga também configuração e dados), depois
@@ -238,14 +260,14 @@ Não. O hook acrescenta uma linha JSON por evento e sai; o coletor faz o resto e
 
 | Comando | O que faz |
 |---|---|
-| `byorzin-monitor setup` | instala ou atualiza neste computador (`--no-sudo`, `--no-claude`, `-y`) |
+| `byorzin-monitor setup` | instala ou atualiza neste computador (`--no-sudo`, `--no-claude`, `--no-services`, `-y`) |
 | `byorzin-monitor doctor` | diagnóstico de serviços, tela, hooks, portas e máquinas |
 | `byorzin-monitor status` | resumo das sessões e máquinas |
 | `byorzin-monitor pair [<ip> <código>]` | gera um código de pareamento ou entra no grupo de outro computador |
 | `byorzin-monitor machines` | máquinas pareadas e as encontradas na rede |
 | `byorzin-monitor panel-url` | link para abrir o painel em outro aparelho |
 | `byorzin-monitor display --backend <nome>` | roda uma tela em primeiro plano (`web`, `terminal`, `turing-a`…) |
-| `byorzin-monitor uninstall [--purge]` | remove serviços, regra udev e hooks |
+| `byorzin-monitor uninstall [--purge]` | remove serviços (systemd/udev ou launchd) e hooks |
 
 ## Privacidade e segurança
 
@@ -267,6 +289,7 @@ ameaças e como reportar uma vulnerabilidade: [SECURITY.md](SECURITY.md).
   Gemini CLI, Aider). Cada provedor ganha a sua cor de Byorzin.
 - Layouts nativos para telas grandes (monitores e TVs 16:9) e telas em pé.
 - Mais telas USB testadas em hardware real — ajuda é bem-vinda (veja `docs/telas.md`).
+- macOS sair do beta (precisa de relatos de Macs de verdade) e depois o **Windows**.
 
 ## Contribuindo
 

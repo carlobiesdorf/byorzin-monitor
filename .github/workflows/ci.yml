@@ -6,18 +6,26 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         python-version: ["3.11", "3.12", "3.13"]
+        include:
+          - os: macos-15-intel        # Intel: Homebrew em /usr/local (o macos-latest é Apple Silicon)
+            python-version: "3.12"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - name: System libraries (cairo for cairosvg, DejaVu fonts for the screen)
+      - name: System libraries (Linux) — cairo for cairosvg, DejaVu fonts for the screen
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libcairo2 fonts-dejavu-core
+      - name: System libraries (macOS) — cairo for cairosvg (fonts come with the package)
+        if: runner.os == 'macOS'
+        run: brew install cairo
       - name: Install
         run: |
           python -m pip install --upgrade pip build
@@ -30,7 +38,67 @@ jobs:
         run: python -m build
       - name: Smoke test the wheel in a clean venv
         run: |
-          python -m venv /tmp/wheelenv
-          /tmp/wheelenv/bin/pip install dist/*.whl
-          /tmp/wheelenv/bin/byorzin-monitor --version
-          /tmp/wheelenv/bin/python -c "import importlib.resources as r; assert r.files('byorzin_monitor').joinpath('panel/static/index.html').is_file()"
+          python -m venv "$RUNNER_TEMP/wheelenv"
+          "$RUNNER_TEMP/wheelenv/bin/pip" install dist/*.whl
+          "$RUNNER_TEMP/wheelenv/bin/byorzin-monitor" --version
+          "$RUNNER_TEMP/wheelenv/bin/python" -c "import importlib.resources as r; f = r.files('byorzin_monitor'); assert f.joinpath('panel/static/index.html').is_file(); assert f.joinpath('display/fonts/DejaVuSans-Bold.ttf').is_file()"
+      - name: End-to-end smoke test (setup, hook, collector, panel, /tela, display)
+        env:
+          SMOKE_ARTIFACT: ${{ runner.temp }}/frame-${{ matrix.os }}-${{ matrix.python-version }}.png
+        run: |
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/wheelenv/bin/python" "$GITHUB_WORKSPACE/scripts/smoke_test.py" "$RUNNER_TEMP/wheelenv/bin/byorzin-monitor"
+      - name: macOS service files are valid (launchd)
+        if: runner.os == 'macOS'
+        run: |
+          "$RUNNER_TEMP/wheelenv/bin/python" - <<'EOF'
+          import plistlib, subprocess, tempfile, pathlib
+          from byorzin_monitor import launchd
+          d = pathlib.Path(tempfile.mkdtemp())
+          for label, args in launchd.SERVICES.items():
+              p = d / f"{label}.plist"
+              p.write_bytes(launchd.plist(label, ["/usr/local/bin/byorzin-monitor", *args]))
+              subprocess.run(["plutil", "-lint", str(p)], check=True)
+          EOF
+      - name: macOS services for real (launchd install, running, panel answers, uninstall)
+        if: runner.os == 'macOS'
+        run: |
+          "$RUNNER_TEMP/wheelenv/bin/python" - <<'EOF'
+          import json, os, time, urllib.request
+          from byorzin_monitor import launchd
+          exe = os.path.join(os.environ["RUNNER_TEMP"], "wheelenv/bin/byorzin-monitor")
+          out = launchd.install([exe])
+          print(out)
+          try:
+              for label in launchd.SERVICES:
+                  for _ in range(30):
+                      if launchd.state(label) == "running":
+                          break
+                      time.sleep(1)
+                  assert launchd.state(label) == "running", (label, launchd.state(label))
+              for _ in range(40):          # o painel do serviço responde na porta padrão
+                  try:
+                      with urllib.request.urlopen("http://127.0.0.1:8788/api/state", timeout=3) as r:
+                          st = json.load(r)
+                      break
+                  except OSError:
+                      time.sleep(1)
+              else:
+                  raise SystemExit("o painel instalado pelo launchd não respondeu")
+              print("painel do launchd:", st["machine"], [m["name"] for m in st["machines"]])
+          finally:
+              logs = launchd.STATE_DIR
+              for f in sorted(logs.glob("*.log")):
+                  print(f"--- {f.name} ---\n" + f.read_text()[-1500:])
+              launchd.uninstall()
+          assert all(launchd.state(l) == "not loaded" for l in launchd.SERVICES)
+          assert not any(launchd.plist_path(l).exists() for l in launchd.SERVICES)
+          print("launchd: ok")
+          EOF
+      - name: Keep the drawn frame
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frame-${{ matrix.os }}-${{ matrix.python-version }}
+          path: ${{ runner.temp }}/frame-*.png
+          if-no-files-found: ignore

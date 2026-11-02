@@ -2,6 +2,7 @@
 # desenha o mesmo quadro K vezes maior sem desalinhar, e as rotas /tela e /img aceitam ?scale=.
 import _env  # noqa: F401
 import io
+import sys
 import threading
 import unittest
 import urllib.request
@@ -43,6 +44,9 @@ def _diff(a, b):
 
 
 class EscalaUm(unittest.TestCase):
+    # a referência é do Linux (cairo e fontes do Debian/Ubuntu); no macOS o cairo do Homebrew
+    # pode diferir em pixels de borda, então lá este teste não vale
+    @unittest.skipUnless(sys.platform == "linux", "referência gerada no Linux")
     def test_tela_usb_byte_a_byte_igual(self):
         self.assertEqual(hd_frames.digests(), GOLDEN)
 

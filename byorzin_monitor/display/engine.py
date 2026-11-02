@@ -633,7 +633,24 @@ def build_parser(prog="byorzin-monitor display"):
                     help="framebuffer em arquivo: tamanho, ex.: 480x320")
     ap.add_argument("--bpp", type=int, choices=(16, 24, 32), default=None,
                     help="framebuffer em arquivo: bits por pixel (padrão 16)")
+    ap.add_argument("--wait", action="store_true",
+                    help="sem tela USB plugada, espera ela aparecer em vez de sair (serviço no macOS)")
     return ap
+
+
+def wait_for_screen(stop, every=3.0):
+    """Espera uma tela USB conhecida aparecer (no Linux quem faz isso é o udev). Devolve False se
+    pediram para parar antes."""
+    from byorzin_monitor.display.backends import detect
+    told = False
+    while not stop:
+        if detect():
+            return True
+        if not told:
+            log("esperando uma tela USB ser plugada…")
+            told = True
+        time.sleep(every)
+    return False
 
 
 def main(argv=None):
@@ -656,6 +673,11 @@ def main(argv=None):
         if backend != "framebuffer":
             raise DisplayError("--size/--bpp só valem com --backend framebuffer")
         opts = {"size": a.size, "bpp": a.bpp}
+    stop = []
+    if a.wait and not a.png and backend == "auto" and not (a.device or conf.get("device")):
+        signal.signal(signal.SIGTERM, lambda *_: stop.append(1))
+        if not wait_for_screen(stop):     # sem tela ainda: não busca dados à toa
+            return 0
     renderer = Renderer(conf, layout=a.layout)
     renderer.wait_ready()
     if a.png:
@@ -685,7 +707,6 @@ def main(argv=None):
         raise
     say = (lambda *_: None) if scr.quiet else log
     say(f"tela aberta: {scr.label} {scr.size[0]}x{scr.size[1]}")
-    stop = []
     signal.signal(signal.SIGTERM, lambda *_: stop.append(1))   # termina o quadro atual antes de sair
     renderer.t0 = time.time()
     last_mode = None

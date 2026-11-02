@@ -26,6 +26,8 @@ UDEV_RULE = "/etc/udev/rules.d/99-byorzin-monitor.rules"
 SYSTEM_UNIT = f"/etc/systemd/system/{UNIT_DISPLAY}"
 LEGACY_USER_UNITS = ["claude-monitor-collector.service", "claude-monitor-panel.service"]
 LEGACY_SYSTEM = ["/etc/systemd/system/claude-monitor-display.service", "/etc/udev/rules.d/99-claude-monitor.rules"]
+MACOS = sys.platform == "darwin"
+UNITS = {"collector": UNIT_COLLECTOR, "panel": UNIT_PANEL, "display": UNIT_DISPLAY}
 
 COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 if COLOR:
@@ -70,6 +72,20 @@ def exec_start(*args):
 
 def has_systemctl():
     return shutil.which("systemctl") is not None
+
+
+def restart_hint(name):
+    """Comando para reiniciar um serviço ("collector", "panel" ou "display") neste sistema."""
+    if MACOS:
+        return f"launchctl kickstart -k gui/{os.getuid()}/com.byorzin-monitor.{name}"
+    return f"{'sudo systemctl' if name == 'display' else 'systemctl --user'} restart {UNITS[name]}"
+
+
+def log_hint(name):
+    """Comando para ver o log de um serviço neste sistema."""
+    if MACOS:
+        return f"tail -n 30 {shlex.quote(str(STATE_DIR / (name + '.log')))}"
+    return f"journalctl {'' if name == 'display' else '--user '}-u {UNITS[name]} -n 30"
 
 
 def run(cmd, check=False, quiet=False):
@@ -238,8 +254,8 @@ def migrate_legacy(no_sudo):
 
 def cmd_setup(a):
     print(f"Byorzin Monitor {__version__} — instalação nesta máquina ({socket.gethostname()})")
-    if sys.platform != "linux":
-        raise SystemExit("Por enquanto o setup automático é só para Linux (veja o README).")
+    if sys.platform not in ("linux", "darwin"):
+        raise SystemExit("Por enquanto o setup automático é só para Linux e macOS (veja o README).")
     STATE_DIR.mkdir(parents=True, exist_ok=True)
 
     step("Migrando instalação anterior (se houver)")
@@ -260,6 +276,42 @@ def cmd_setup(a):
     if config_error():
         raise UserError(f"{CONFIG_FILE}: {config_error()}. Corrija o arquivo e rode o setup de novo.")
 
+    if a.no_services:
+        print(f"\n(--no-services: nada instalado como serviço; rode à mão {exe()} collector  e  {exe()} panel)")
+    elif MACOS:
+        setup_macos(a)
+    else:
+        setup_linux(a, cfg)
+
+    if not a.no_claude:
+        step("Hooks e status line do Claude Code")
+        from byorzin_monitor.claude_settings import apply
+        apply(exe(), yes=a.yes)
+
+    step("Pronto")
+    ip = lan_ip()
+    print(f"   Painel: http://{ip}:{cfg['panel_port']}")
+    print(f"   Diagnóstico: byorzin-monitor doctor")
+    print("\n   Para juntar outra máquina: instale nela (byorzin-monitor setup), gere um código")
+    print(f"   aqui (painel → Máquinas, ou: byorzin-monitor pair) e, na outra, rode:")
+    print(f"   byorzin-monitor pair {ip} <código>     (ou clique em Parear no painel dela)")
+    print("   Alternativa manual: setup --token <token desta máquina> --peer http://" + f"{ip}:{cfg['port']}")
+    return 0
+
+
+def setup_macos(a):
+    from byorzin_monitor import launchd
+    step("Serviços do usuário (launchd): coletor, painel e tela")
+    for label, st in launchd.install(exe_argv()).items():
+        print(f"   {label}: {st}")
+    print(f"   arquivos em {launchd.AGENTS_DIR}; logs em {STATE_DIR}")
+    print("   A tela USB é detectada sozinha ao ser plugada (sem driver nem sudo).")
+    print("   Com outras máquinas: o macOS (15 ou mais novo) pede permissão de \"Rede Local\" para o Python na")
+    print("   primeira conexão — permita. Se negou: Ajustes do Sistema → Privacidade e Segurança → Rede Local.")
+    print("   O firewall do macOS (se ligado) também pode perguntar se o Python aceita conexões: permita.")
+
+
+def setup_linux(a, cfg):
     step("Serviços do usuário: coletor e painel")
     USER_UNITS.mkdir(parents=True, exist_ok=True)
     (USER_UNITS / UNIT_COLLECTOR).write_text(collector_unit())
@@ -301,21 +353,6 @@ def cmd_setup(a):
                     sudo(f"{ufw} allow from {lan} to any port {port} proto tcp comment 'byorzin-monitor {what}'")
                 sudo(f"{ufw} allow from {lan} to any port {cfg.get('discovery_port', 8789)} proto udp comment 'byorzin-monitor descoberta'")
 
-    if not a.no_claude:
-        step("Hooks e status line do Claude Code")
-        from byorzin_monitor.claude_settings import apply
-        apply(exe(), yes=a.yes)
-
-    step("Pronto")
-    ip = lan_ip()
-    print(f"   Painel: http://{ip}:{cfg['panel_port']}")
-    print(f"   Diagnóstico: byorzin-monitor doctor")
-    print("\n   Para juntar outra máquina: instale nela (byorzin-monitor setup), gere um código")
-    print(f"   aqui (painel → Máquinas, ou: byorzin-monitor pair) e, na outra, rode:")
-    print(f"   byorzin-monitor pair {ip} <código>     (ou clique em Parear no painel dela)")
-    print("   Alternativa manual: setup --token <token desta máquina> --peer http://" + f"{ip}:{cfg['port']}")
-    return 0
-
 
 # ---------------------------------------------------------------- doctor
 def cmd_doctor(a):
@@ -331,13 +368,19 @@ def cmd_doctor(a):
 
     print(f"Byorzin Monitor {__version__} em {socket.gethostname()}\n")
     check(sys.version_info >= (3, 11), f"Python {sys.version.split()[0]}", "precisa de Python 3.11 ou mais novo")
+    from byorzin_monitor.sysinfo import prepare_cairo
+    prepare_cairo()
     for mod in ("serial", "PIL", "numpy", "cairosvg"):
         try:
             __import__(mod)
             check(True, f"biblioteca {mod}")
         except Exception as e:
-            check(False, f"biblioteca {mod}: {e}", "sudo apt install libcairo2  (cairosvg) / pipx reinstall byorzin-monitor")
-    check(os.path.exists("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"), "fontes DejaVu", "sudo apt install fonts-dejavu-core")
+            check(False, f"biblioteca {mod}: {e}", ("brew install cairo" if MACOS else "sudo apt install libcairo2")
+                  + "  (cairosvg) / pipx reinstall byorzin-monitor")
+    if not MACOS:          # no macOS a tela usa as fontes que vêm no pacote
+        # sem as do sistema a tela usa as que vêm no pacote: vira só um aviso
+        check(os.path.exists("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"), "fontes DejaVu", "sudo apt install fonts-dejavu-core",
+              warn=True)
 
     from byorzin_monitor.common import config_error
     cfg = load_config()
@@ -347,7 +390,13 @@ def cmd_doctor(a):
     else:
         check(CONFIG_FILE.exists() and bool(cfg.get("token")), f"configuração {CONFIG_FILE}", "byorzin-monitor setup")
     svc = {}
-    if not has_systemctl():
+    if MACOS:
+        from byorzin_monitor import launchd
+        for name in ("collector", "panel"):
+            st = launchd.state(f"{launchd.PREFIX}.{name}")
+            svc[UNITS[name]] = "active" if st == "running" else st
+            check(st == "running", f"serviço {launchd.PREFIX}.{name}: {st}", "byorzin-monitor setup")
+    elif not has_systemctl():
         check(False, "systemd (systemctl) não encontrado: os serviços não são gerenciados aqui",
               f"rode à mão: {exe()} collector  e  {exe()} panel", warn=True)
     else:
@@ -370,17 +419,19 @@ def cmd_doctor(a):
         why = getattr(e, "reason", None) or e
         if svc.get(UNIT_COLLECTOR) == "active":
             check(False, f"o serviço do coletor está ativo, mas nada responde na porta configurada ({cfg['port']}): {why}",
-                  f"a porta mudou no config.toml depois que ele subiu? systemctl --user restart {UNIT_COLLECTOR}; "
-                  f"veja também journalctl --user -u {UNIT_COLLECTOR} -n 30")
+                  f"a porta mudou no config.toml depois que ele subiu? {restart_hint('collector')}; "
+                  f"veja também {log_hint('collector')}")
         else:
-            check(False, f"coletor não responde na porta {cfg['port']}: {why}", f"journalctl --user -u {UNIT_COLLECTOR} -n 30")
+            check(False, f"coletor não responde na porta {cfg['port']}: {why}", log_hint("collector"))
     for p in cfg.get("peers", []):
         try:
             st = get(p.rstrip("/"))
             check(True, f"peer {p} → {st.get('host')}")
         except Exception as e:
             check(False, f"peer {p} não responde: {e}",
-                  "a outra máquina está ligada? firewall liberado (porta 8787)? mesmo token?", warn=True)
+                  "a outra máquina está ligada? firewall liberado (porta 8787)? mesmo token?"
+                  + (" No macOS: Ajustes do Sistema → Privacidade e Segurança → Rede Local → permita o Python"
+                     " (os serviços precisam disso; o Terminal não)." if MACOS else ""), warn=True)
 
     # [máquinas] descoberta na rede local
     from byorzin_monitor.network import discover, disc_params, is_paired, machines_meta
@@ -408,6 +459,11 @@ def cmd_doctor(a):
     if screens:
         for s in screens:
             check(True, f"tela: {s['label']} em {s['device']}")
+    if screens and MACOS:
+        from byorzin_monitor import launchd
+        st = launchd.state(f"{launchd.PREFIX}.display")
+        check(st == "running", f"serviço da tela: {st}", f"byorzin-monitor setup; veja {log_hint('display')}")
+    elif screens:
         in_dialout = "dialout" in {grp.getgrgid(g).gr_name for g in os.getgroups()}
         check(in_dialout, "usuário no grupo dialout (acesso à porta serial)", f"sudo usermod -aG dialout {getpass.getuser()} e faça login de novo")
         check(os.path.exists(UDEV_RULE), "regra udev (liga a tela ao plugar)", "byorzin-monitor setup")
@@ -439,8 +495,9 @@ def cmd_doctor(a):
         check(False, "nenhum evento recebido ainda", "abra uma sessão nova do Claude Code nesta máquina", warn=True)
     check(RATE_FILE.exists(), "uso da semana/5h conhecido (status line)",
           "aparece após a 1ª resposta de uma sessão com assinatura Pro/Max", warn=True)
-    ntp = run(["timedatectl", "show", "-p", "NTPSynchronized", "--value"], quiet=True).stdout.strip()
-    check(ntp == "yes", "relógio sincronizado (NTP)", "sudo apt install systemd-timesyncd && sudo timedatectl set-ntp true", warn=True)
+    if not MACOS:          # no macOS a hora é sincronizada pelo sistema (Ajustes → Geral → Data e Hora)
+        ntp = run(["timedatectl", "show", "-p", "NTPSynchronized", "--value"], quiet=True).stdout.strip()
+        check(ntp == "yes", "relógio sincronizado (NTP)", "sudo apt install systemd-timesyncd && sudo timedatectl set-ntp true", warn=True)
     print(f"\n{'Tudo certo!' if not probs else f'{probs} problema(s) encontrado(s).'}  Painel: http://{lan_ip()}:{cfg['panel_port']}")
     return 1 if probs else 0
 
@@ -552,12 +609,13 @@ def cmd_panel_url(a):
     except urllib.error.HTTPError as e:
         if e.code == 404:
             raise UserError("o painel desta máquina não tem a rota /api/panel-url (versão antiga?). "
-                            "Atualize e reinicie o painel: systemctl --user restart " + UNIT_PANEL) from None
+                            "Atualize e reinicie o painel: " + restart_hint("panel")) from None
         raise UserError(f"o painel respondeu {e.code} em {url}") from None
     except (urllib.error.URLError, OSError) as e:
         raise UserError(f"o painel desta máquina não responde na porta {cfg['panel_port']} "
-                        f"({getattr(e, 'reason', e)}). Ele precisa estar rodando: systemctl --user status "
-                        f"{UNIT_PANEL}  (ou byorzin-monitor doctor)") from None
+                        f"({getattr(e, 'reason', e)}). Ele precisa estar rodando: "
+                        f"{restart_hint('panel') if MACOS else 'systemctl --user status ' + UNIT_PANEL}  "
+                        "(ou byorzin-monitor doctor)") from None
     try:
         data = json.loads(body)
         link = data.get("url") or data.get("link") if isinstance(data, dict) else None
@@ -577,11 +635,15 @@ def cmd_uninstall(a):
     step("Hooks e status line do Claude Code")
     apply(exe(), remove=True, yes=a.yes)
     step("Serviços do usuário")
-    for u in (UNIT_COLLECTOR, UNIT_PANEL):
-        run(["systemctl", "--user", "disable", "--now", u], quiet=True)
-        (USER_UNITS / u).unlink(missing_ok=True)
-    run(["systemctl", "--user", "daemon-reload"])
-    if not a.no_sudo:
+    if MACOS:
+        from byorzin_monitor import launchd
+        launchd.uninstall()
+    else:
+        for u in (UNIT_COLLECTOR, UNIT_PANEL):
+            run(["systemctl", "--user", "disable", "--now", u], quiet=True)
+            (USER_UNITS / u).unlink(missing_ok=True)
+        run(["systemctl", "--user", "daemon-reload"])
+    if not a.no_sudo and not MACOS:
         step("Partes de sistema (sudo)")
         sudo(f"systemctl disable --now {UNIT_DISPLAY}")
         sudo(f"rm -f {SYSTEM_UNIT} {UDEV_RULE}")
@@ -609,6 +671,7 @@ def build_parser():
     p.add_argument("--lan", default=None, help="rede liberada no firewall (padrão: a sub-rede da interface principal, ex.: 192.168.1.0/24)")
     p.add_argument("--no-sudo", action="store_true", help="não mexe em nada que precise de sudo")
     p.add_argument("--no-claude", action="store_true", help="não mexe no ~/.claude/settings.json")
+    p.add_argument("--no-services", action="store_true", help="só configura; não instala serviços nem a tela (testes, contêineres)")
     p.add_argument("--yes", "-y", action="store_true", help="não pergunta antes de alterar o settings.json")
     sub.add_parser("doctor", help="diagnóstico com dicas de correção")
     sub.add_parser("status", help="resumo das sessões e máquinas")
@@ -683,7 +746,8 @@ def main(argv=None):
             what = "painel" if argv[:1] == ["panel"] else "coletor"
             port = cfg["panel_port"] if what == "painel" else cfg["port"]
             return _fail(f"a porta {port} ({what}) já está em uso: outro byorzin-monitor já está rodando "
-                         f"(systemctl --user status byorzin-monitor-*) ou outro programa usa a porta. "
+                         f"({'launchctl list | grep byorzin' if MACOS else 'systemctl --user status byorzin-monitor-*'}) "
+                         f"ou outro programa usa a porta. "
                          f"Troque `{'panel_port' if what == 'painel' else 'port'}` no config.toml ou pare o outro.")
         if isinstance(e, PermissionError):
             return _fail(f"sem permissão: {e.filename or e}")
