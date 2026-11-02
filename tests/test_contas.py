@@ -5,6 +5,7 @@ import _env  # noqa: F401
 import io
 import json
 import os
+import sys
 import tempfile
 import time
 import unittest
@@ -319,6 +320,8 @@ def overlaps(boxes):
 
 
 class Tela(unittest.TestCase):
+    # referência de pixels gerada no Linux (ver test_hd.py): no macOS o cairo do Homebrew difere
+    @unittest.skipUnless(sys.platform == "linux", "referência gerada no Linux")
     def test_uma_conta_mesma_tela(self):
         """Com uma conta no formato novo (account/rates), os quadros batem com os hashes de antes."""
         from test_hd import GOLDEN
