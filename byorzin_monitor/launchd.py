@@ -65,10 +65,7 @@ def install(exe_argv):
     for label, args in SERVICES.items():
         path = plist_path(label)
         if _launchctl("bootout", f"{_domain()}/{label}").returncode == 0:   # versão anterior rodando
-            for _ in range(30):              # espera o launchd soltar o rótulo (até ~15 s)
-                if _launchctl("print", f"{_domain()}/{label}").returncode != 0:
-                    break
-                time.sleep(0.5)
+            _wait_unloaded(label)
         path.write_bytes(plist(label, list(exe_argv) + args))
         for attempt in range(6):     # mesmo assim ele às vezes recusa por um instante (erro 5 ou 37)
             r = _launchctl("bootstrap", _domain(), str(path))
@@ -102,7 +99,17 @@ def restart(label):
     return _launchctl("kickstart", "-k", f"{_domain()}/{label}").returncode == 0
 
 
+def _wait_unloaded(label, timeout=15):
+    """O bootout volta antes de o launchd soltar o rótulo; espera ele sumir (até `timeout` s)."""
+    for _ in range(int(timeout * 2)):
+        if _launchctl("print", f"{_domain()}/{label}").returncode != 0:
+            return True
+        time.sleep(0.5)
+    return False
+
+
 def uninstall():
     for label in SERVICES:
-        _launchctl("bootout", f"{_domain()}/{label}")
+        if _launchctl("bootout", f"{_domain()}/{label}").returncode == 0:
+            _wait_unloaded(label)
         plist_path(label).unlink(missing_ok=True)

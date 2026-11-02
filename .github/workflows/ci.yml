@@ -91,7 +91,8 @@ jobs:
               for f in sorted(logs.glob("*.log")):
                   print(f"--- {f.name} ---\n" + f.read_text()[-1500:])
               launchd.uninstall()
-          assert all(launchd.state(l) == "not loaded" for l in launchd.SERVICES)
+          left = {l: launchd.state(l) for l in launchd.SERVICES}
+          assert set(left.values()) == {"not loaded"}, left
           assert not any(launchd.plist_path(l).exists() for l in launchd.SERVICES)
           print("launchd: ok")
           EOF

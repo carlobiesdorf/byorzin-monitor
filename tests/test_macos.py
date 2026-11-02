@@ -281,12 +281,19 @@ class Launchd(unittest.TestCase):
         d = Path(tempfile.mkdtemp(dir=_env.TMP))
         for l in launchd.SERVICES:
             (d / f"{l}.plist").write_text("x")
-        calls = []
-        with mock.patch.object(launchd, "AGENTS_DIR", d), \
-                mock.patch.object(launchd, "_launchctl", lambda *a: calls.append(a)):
+        calls, printed = [], []
+
+        def ctl(*a):
+            calls.append(a)
+            if a[0] == "print":          # ainda carregado na 1ª pergunta, descarregado na 2ª
+                printed.append(a[1])
+                return subprocess.CompletedProcess(a, 0 if printed.count(a[1]) == 1 else 113, "", "")
+            return subprocess.CompletedProcess(a, 0, "", "")
+        with mock.patch.object(launchd, "AGENTS_DIR", d), mock.patch.object(launchd, "_launchctl", ctl), \
+                mock.patch.object(launchd.time, "sleep", lambda *_: None):
             launchd.uninstall()
         self.assertEqual(list(d.iterdir()), [])
-        self.assertEqual([c[0] for c in calls], ["bootout"] * 3)
+        self.assertEqual([c[0] for c in calls], ["bootout", "print", "print"] * 3)   # esperou cada um sair
 
 
 class Cli(unittest.TestCase):
